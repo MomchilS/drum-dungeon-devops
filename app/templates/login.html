@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Momo's Drum Dungeon</title>
+
+    <!-- Pixel font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+        rel="stylesheet"
+    >
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        /* === BACKGROUND VARIABLE (easy to swap later) === */
+        :root {
+            --login-bg: url("/static/backgrounds/login_bg.png");
+        }
+
+        input, button {
+            box-sizing: border-box;
+            max-width: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', monospace;
+
+            background-color: #000;
+            background-image: var(--login-bg);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: top center;
+
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /*  IMPORTANT FIX */
+        }
+
+        /* === DARK OVERLAY FOR READABILITY === */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            pointer-events: none;
+        }
+
+        .app {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            padding: 12px;
+            margin-top: 70px;     /*  pulls everything up */
+        }
+
+        /* === TITLE (optional, can remove if banner includes text) === */
+        .title {
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        /* === BANNER === */
+        .banner {
+            margin-bottom: 4px;  /*  very tight, pulls login up */
+        }
+
+        .banner img {
+            width: 100%;
+            height: auto;
+            image-rendering: pixelated;
+            display: block;
+        }
+
+        /* === LOGIN CARD === */
+        .card {
+            background: #ffffff;
+            border: 4px solid #000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        label {
+            font-size: 10px;
+            display: block;
+            margin-top: 12px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 10px;
+            border: 3px solid #000;
+            margin-top: 6px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 11px;
+            border: 3px solid #000;
+            background: #ffd966;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="banner">
+        <img
+            src="/static/images/login_banner.png"
+            alt="Momo's Drum Dungeon"
+        >
+    </div>
+
+    <div class="card">
+        <form method="post" action="/login">
+            <label>Username</label>
+            <input type="text" name="username" required>
+
+            <label>Password</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">
+                Enter the Dungeon
+            </button>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>

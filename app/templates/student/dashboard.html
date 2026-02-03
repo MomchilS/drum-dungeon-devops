@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard</title>
+
+    <!-- Pixel font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        /* === BACKGROUND VARIABLE (reuse login background) === */
+        :root {
+            --student-bg: url("/static/backgrounds/login_bg.png");
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', monospace;
+
+            background-color: #000;
+            background-image: var(--student-bg);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* === DARK OVERLAY FOR READABILITY === */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            pointer-events: none;
+        }
+
+        /* === OUTER APP WRAPPER === */
+        .app {
+            position: relative; /* keeps card above overlay */
+            width: 100%;
+            max-width: 420px;
+            padding: 16px 12px;
+        }
+
+        /* === MAIN CARD === */
+        .card {
+            width: 100%;
+            background: #ffffff;
+            border: 4px solid #000;
+            padding: 16px;
+            text-align: center;
+        }
+
+        /* === NAME === */
+        .student-name {
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        /* ===========================
+           AVATAR FRAME (BASE)
+        =========================== */
+
+        .avatar-frame {
+            width: 100%;
+            margin: 14px 0;
+            padding: 6px;
+            border: 4px solid #000;
+            background: #f4f1e8;
+            box-shadow: inset 0 0 0 3px #000;
+        }
+
+        .avatar-inner {
+            border: 3px solid #000;
+            background: #c8c8c8;
+            padding: 4px;
+        }
+
+        .avatar-inner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        /* ===========================
+           RARITY FRAMES
+        =========================== */
+
+        /* BASIC (Level 1–4) */
+        .frame-basic {
+            background: #e2d3b3;
+            box-shadow:
+                inset 0 0 0 3px #6b4f2e,
+                inset 0 0 0 6px #000;
+        }
+
+        /* SILVER (Level 5–9) */
+        .frame-silver {
+            background: linear-gradient(180deg, #dfe3ea, #bfc5cf);
+            box-shadow:
+                inset 0 0 0 3px #7a8491,
+                inset 0 0 0 6px #000;
+        }
+
+        /* GOLD (Level 10–19) */
+        .frame-gold {
+            background: linear-gradient(180deg, #ffe18a, #f2b705);
+            box-shadow:
+                inset 0 0 0 3px #b38700,
+                inset 0 0 0 6px #000,
+                0 0 6px rgba(255, 200, 0, 0.6);
+            border-top-width: 6px;
+        }
+
+        /* ARCANE (Level 20–39) */
+        .frame-arcane {
+            background: linear-gradient(135deg, #6b3fa0, #2fa96b);
+            box-shadow:
+                inset 0 0 0 3px #3b1d5a,
+                inset 0 0 0 6px #000,
+                0 0 8px rgba(120, 80, 200, 0.6);
+            border-left-width: 6px;
+        }
+
+        /* INFERNO (Level 40+) */
+        .frame-inferno {
+            background: linear-gradient(180deg, #5a0000, #ff3b00, #ffb000);
+            box-shadow:
+                inset 0 0 0 3px #9b0000,
+                inset 0 0 0 6px #000,
+                0 0 10px rgba(255, 60, 0, 0.8);
+            border-width: 6px;
+        }
+
+        /* === LEVEL === */
+        .level {
+            font-size: 14px;
+            margin: 12px 0 8px 0;
+        }
+
+        /* === XP BAR === */
+        .xp-container {
+            width: 100%;
+            border: 3px solid #000;
+            height: 24px;
+            background: #ddd;
+            margin: 10px 0;
+        }
+
+        .xp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #42c85f, #6df59b);
+            width: var(--xp-percent);
+        }
+
+        /* === STATS === */
+        .stats {
+            font-size: 10px;
+            margin-top: 8px;
+            line-height: 1.6;
+        }
+
+        .divider {
+            margin: 16px 0;
+            border-top: 3px dashed #000;
+        }
+
+        /* === NAV === */
+        .nav {
+            font-size: 10px;
+            line-height: 1.8;
+        }
+
+        .nav a {
+            color: #000;
+            text-decoration: none;
+        }
+
+        .nav a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="card">
+
+        <!-- NAME -->
+        <div class="student-name">
+            {{ student }}
+        </div>
+
+        <!-- AVATAR WITH RARITY FRAME -->
+        <div class="avatar-frame
+            {% if stats.level.current >= 40 %}
+                frame-inferno
+            {% elif stats.level.current >= 20 %}
+                frame-arcane
+            {% elif stats.level.current >= 10 %}
+                frame-gold
+            {% elif stats.level.current >= 5 %}
+                frame-silver
+            {% else %}
+                frame-basic
+            {% endif %}
+        ">
+            <div class="avatar-inner">
+                <img
+                  src="/static/avatars/{{ stats.profile.avatar | default('default.png') }}"
+                  alt="Avatar"
+                >
+            </div>
+        </div>
+
+        <!-- LEVEL -->
+        <div class="level">
+            Level {{ stats.level.current }}
+        </div>
+
+        {% set total = stats.level.progress_xp + stats.level.xp_to_next %}
+        {% set percent = (stats.level.progress_xp / total) * 100 %}
+
+        <!-- XP BAR -->
+        <div class="xp-container">
+            <div class="xp-fill" style="--xp-percent: {{ percent }}%;"></div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats">
+            XP {{ stats.level.progress_xp }} / {{ total }}<br>
+            Streak: {{ stats.streak.current }} days<br><br>
+
+            Medals:<br>
+            {% if stats.medals %}
+                {% for mid in stats.medals %}
+                    {{ medals_map.get(mid, mid) }}<br>
+                {% endfor %}
+            {% else %}
+                None yet
+            {% endif %}
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- NAV -->
+        <div class="nav">
+            <a href="/student/dashboard/daily-pad-exercises">Daily Pad Exercises</a><br>
+            <a href="/student/dashboard/history">History</a><br>
+            <a href="/leaderboard">Leaderboard</a> |
+            <a href="/logout">Logout</a>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaderboard</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
+        rel="stylesheet"
+    >
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', monospace;
+            background: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 420px;
+            padding: 16px 12px;
+        }
+
+        .card {
+            width: 100%;
+            background: #ffffff;
+            border: 4px solid #000;
+            padding: 16px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        /* === LEADERBOARD LIST === */
+        .leaderboard {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .row {
+            border: 3px solid #000;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+
+        .left {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .rank {
+            font-weight: bold;
+        }
+
+        .name {
+            text-align: left;
+        }
+
+        /* === RIGHT SIDE (XP + STREAK) === */
+        .right {
+            text-align: right;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .divider {
+            margin: 14px 0;
+            border-top: 3px dashed #000;
+        }
+
+        .nav {
+            font-size: 10px;
+            line-height: 1.8;
+        }
+
+        .nav a {
+            color: #000;
+            text-decoration: none;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="app">
+
+    <div class="card">
+
+        <h1>Leaderboard</h1>
+
+        <div class="leaderboard">
+            {% for student in students %}
+                <div class="row">
+                    <div class="left">
+                        <div class="rank">#{{ loop.index }}</div>
+                        <div class="name">{{ student.name }}</div>
+                    </div>
+                    <div class="right">
+                        {{ student.xp_total }} XP<br>
+                        {{ student.streak }} Streaks
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="nav">
+            <a href="/student/dashboard">← Back to Dashboard</a>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from services.level_utils import recalculate_levels
-from services.medals import check_and_award_medals
+from app.services.level_utils import recalculate_levels
+from app.services.medals import check_and_award_medals
 
 # Environment-aware base directory
 BASE_DIR = Path(os.environ.get("PRACTICE_DATA_DIR", "/srv/practice-data"))

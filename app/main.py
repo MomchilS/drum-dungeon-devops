@@ -1,30 +1,5 @@
-#from services.exercises import DAILY_EXERCISES
-#from services.medals import medal_labels
-#from fastapi import FastAPI, Request, Form
-#from fastapi.responses import HTMLResponse, RedirectResponse
-#from fastapi.templating import Jinja2Templates
-#from fastapi.staticfiles import StaticFiles
-#from starlette.middleware.sessions import SessionMiddleware
-#from auth import DATA_DIR as BASE_DIR
-
-#import json
-#import shutil
-#from pathlib import Path
-#import os
-#import sys
-#from datetime import date, timedelta
-#import subprocess
-
-
-#from pathlib import Path
-#from auth import load_users, verify_password, update_password
-#from services.attendance import apply_attendance
-
-
-
-
-from webapp.auth import DATA_DIR as BASE_DIR
-from webapp.auth import load_users, verify_password, update_password
+from app.auth import DATA_DIR as BASE_DIR
+from app.auth import load_users, verify_password, update_password
 
 from pathlib import Path
 import os
@@ -34,9 +9,9 @@ import shutil
 from datetime import date, timedelta
 import subprocess
 
-from webapp.services.exercises import DAILY_EXERCISES
-from webapp.services.medals import medal_labels
-from webapp.services.attendance import apply_attendance
+from app.services.exercises import DAILY_EXERCISES
+from app.services.medals import medal_labels
+from app.services.attendance import apply_attendance
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -44,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-# ✅ DEFINE DERIVED PATHS ONLY AFTER BASE_DIR IS SET
+# DEFINE DERIVED PATHS ONLY AFTER BASE_DIR IS SET
 STUDENTS_DIR = BASE_DIR / "students"
 LEADERBOARD_FILE = BASE_DIR / "leaderboard.json"
 
@@ -123,8 +98,11 @@ app.add_middleware(
 # Templates & Static files
 # ---------------------------------------------------
 
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 ###BASE_DIR = Path(os.environ.get("PRACTICE_DATA_DIR", "/srv/practice-data"))
 
@@ -319,7 +297,7 @@ def remove_student(
         shutil.rmtree(student_dir)
 
     # Remove from auth system
-    from webapp.auth import delete_user
+    from app.auth import delete_user
     delete_user(student)
 
     return RedirectResponse(
@@ -368,7 +346,7 @@ def add_student(
         #)
 
     # 2) Add user to auth system
-    from webapp.auth import add_user
+    from app.auth import add_user
 
     add_user(
         username=username,

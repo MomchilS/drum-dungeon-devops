@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from services.exercises import DAILY_EXERCISES
-from services.medals import check_and_award_medals
-from services.level_utils import recalculate_levels
+from app.services.medals import check_and_award_medals
+from app.services.level_utils import recalculate_levels
 
 # ========================
 # ENVIRONMENT / CONFIG

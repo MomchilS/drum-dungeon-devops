@@ -12,15 +12,19 @@ import subprocess
 from app.services.exercises import DAILY_EXERCISES
 from app.services.medals import medal_labels
 from app.services.attendance import apply_attendance
+from app.auth import add_user
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi import Form, Request
+from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 # DEFINE DERIVED PATHS ONLY AFTER BASE_DIR IS SET
 STUDENTS_DIR = BASE_DIR / "students"
+STUDENTS_DIR.mkdir(parents=True, exist_ok=True)
 LEADERBOARD_FILE = BASE_DIR / "leaderboard.json"
 
 
@@ -127,7 +131,7 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
     if not user or not verify_password(password, user["password"]):
         return RedirectResponse("/", status_code=302)
 
-    request.session["user"] = username
+    request.session["username"] = username
     request.session["role"] = user["role"]
 
     if user["role"] == "student" and user.get("force_change"):
@@ -136,6 +140,22 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
     if user["role"] == "admin":
         return RedirectResponse("/admin/dashboard", status_code=302)
 
+    return RedirectResponse("/student/dashboard", status_code=302)
+
+
+@app.post("/change-password")
+def change_password_submit(
+    request: Request,
+    password: str = Form(...),
+    confirm: str = Form(...)
+):
+    if request.session.get("role") != "student":
+        return RedirectResponse("/", status_code=302)
+
+    if password != confirm:
+        return RedirectResponse("/change-password", status_code=302)
+
+    update_password(request.session["username"], password)
     return RedirectResponse("/student/dashboard", status_code=302)
 
 
@@ -171,7 +191,7 @@ def change_password_submit(
     if password != confirm:
         return RedirectResponse("/change-password", status_code=302)
 
-    update_password(request.session["user"], password)
+    update_password(request.session["username"], password)
     return RedirectResponse("/student/dashboard", status_code=302)
 
 # ---------------------------------------------------
@@ -220,7 +240,6 @@ def admin_attendance_form(request: Request):
     )
 
 from datetime import date as today_date
-import json
 
 @app.post("/admin/attendance")
 def admin_attendance_submit(
@@ -305,6 +324,10 @@ def remove_student(
         status_code=302
     )
 
+
+
+from app.auth import add_user
+
 @app.post("/admin/dashboard/student-management/add")
 def add_student(
     request: Request,
@@ -313,41 +336,15 @@ def add_student(
     password: str = Form(...),
     avatar: str = Form(...),
 ):
+    # ------------------------------------------------------------------
+    # Auth guard
+    # ------------------------------------------------------------------
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    # 1) Create student using environment‑aware script
-    env = {
-        **os.environ,
-        "PRACTICE_DATA_DIR": str(BASE_DIR),
-    }
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(BASE_DIR / "scripts" / "create_student.py"),
-            username,
-        ],
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        print("CREATE_STUDENT FAILED")
-        print("STDOUT:", result.stdout)
-        print("STDERR:", result.stderr)
-        raise RuntimeError("create_student.py failed")
-
-    #if result.returncode != 0:
-        #return RedirectResponse(
-            #"/admin/dashboard/student-management",
-            #status_code=302
-        #)
-
-    # 2) Add user to auth system
-    from app.auth import add_user
-
+    # ------------------------------------------------------------------
+    # 1. Create user in auth system
+    # ------------------------------------------------------------------
     add_user(
         username=username,
         password=password,
@@ -355,17 +352,56 @@ def add_student(
         force_change=True,
     )
 
-    # 3) Set avatar in stats.json
-    stats_file = STUDENTS_DIR / username / "stats.json"
+    # ------------------------------------------------------------------
+    # 2. Create student directory
+    # ------------------------------------------------------------------
+    student_dir = STUDENTS_DIR / username
+    student_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(stats_file, "r") as f:
-        stats = json.load(f)
+    # ------------------------------------------------------------------
+    # 3. Create initial stats.json if missing
+    # ------------------------------------------------------------------
+    stats_file = student_dir / "stats.json"
 
-    stats.setdefault("profile", {})["avatar"] = avatar
+    if not stats_file.exists():
+        stats = {
+            "xp": {
+                "total": 0,
+                "categories": {
+                    "pad_practice": 0
+                }
+            },
+            "level": {
+                "current": 1,
+                "progress_xp": 0,
+                "xp_to_next": 10
+            },
+            "streak": {
+                "current": 0,
+                "longest": 0,
+                "last_practice_date": None
+            },
+            "attendance": {
+                "total": 0,
+                "dates": [],
+                "current_month": {
+                    "month": None,
+                    "count": 0
+                }
+            },
+            "profile": {
+                "name": name,
+                "avatar": avatar
+            },
+            "history": {}
+        }
 
-    with open(stats_file, "w") as f:
-        json.dump(stats, f, indent=2)
+        with open(stats_file, "w") as f:
+            json.dump(stats, f, indent=2)
 
+    # ------------------------------------------------------------------
+    # 4. Redirect back to student management
+    # ------------------------------------------------------------------
     return RedirectResponse(
         "/admin/dashboard/student-management",
         status_code=302
@@ -380,7 +416,7 @@ def student_dashboard(request: Request):
     if request.session.get("role") != "student":
         return RedirectResponse("/", status_code=302)
 
-    student = request.session["user"]
+    student = request.session["username"]
     stats_file = STUDENTS_DIR / student / "stats.json"
 
     with open(stats_file) as f:
@@ -426,7 +462,7 @@ def complete_daily_pad_exercise(
     if request.session.get("role") != "student":
         return RedirectResponse("/", status_code=302)
 
-    student = request.session["user"]
+    student = request.session["username"]
 
     env = {
         **os.environ,
@@ -448,7 +484,6 @@ def complete_daily_pad_exercise(
 
     # Write history entry
     from datetime import date
-    import json
 
     stats_file = STUDENTS_DIR / student / "stats.json"
 
@@ -481,7 +516,7 @@ def student_history(request: Request):
     if request.session.get("role") != "student":
         return RedirectResponse("/", status_code=302)
 
-    student = request.session["user"]
+    student = request.session["username"]
     stats_file = STUDENTS_DIR / student / "stats.json"
 
     if not stats_file.exists():

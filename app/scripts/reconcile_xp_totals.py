@@ -37,4 +37,4 @@ stats["level"]["xp_to_next"] = (
 with open(STATS_FILE, "w") as f:
     json.dump(stats, f, indent=2)
 
-print(" XP totals and levels reconciled from category XP")
+print("✅ XP totals and levels reconciled from category XP")

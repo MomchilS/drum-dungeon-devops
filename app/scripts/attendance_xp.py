@@ -25,7 +25,7 @@ STATS_FILE = Path(
 )
 
 if not STATS_FILE.exists():
-    print(f" Student '{STUDENT}' not found")
+    print(f"❌ Student '{STUDENT}' not found")
     sys.exit(1)
 
 # ========================
@@ -86,4 +86,4 @@ stats["history"]["last_updated"] = now.isoformat()
 with open(STATS_FILE, "w") as f:
     json.dump(stats, f, indent=2)
 
-print(f" Attendance XP recorded for {STUDENT}")
+print(f"✅ Attendance XP recorded for {STUDENT}")

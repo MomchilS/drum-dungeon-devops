@@ -12,14 +12,11 @@ import json
 # --------------------------------------------------
 
 if "PRACTICE_DATA_DIR" not in os.environ:
-    print(" PRACTICE_DATA_DIR environment variable is not set", file=sys.stderr)
+    print("❌ PRACTICE_DATA_DIR environment variable is not set", file=sys.stderr)
     sys.exit(1)
 
 BASE_DIR = Path(os.environ["PRACTICE_DATA_DIR"])
 STUDENTS_DIR = BASE_DIR / "students"
-
-def log(msg: str):
-    print(msg.encode("ascii", errors="replace").decode())
 
 # --------------------------------------------------
 # Arguments
@@ -35,7 +32,7 @@ STUDENT_DIR = STUDENTS_DIR / STUDENT
 STUDENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 if STUDENT_DIR.exists():
-    print(" Student already exists", file=sys.stderr)
+    print("❌ Student already exists", file=sys.stderr)
     sys.exit(1)
 
 # --------------------------------------------------
@@ -59,7 +56,7 @@ if TEMPLATE_HOOKS.exists():
         dirs_exist_ok=True
     )
 else:
-    print("No template hooks found, continuing without them")
+    print("⚠️ No template hooks found, continuing without them")
 
 # --------------------------------------------------
 # Optional: init Taskwarrior DB
@@ -76,7 +73,7 @@ try:
         check=False,
     )
 except FileNotFoundError:
-    print("Taskwarrior not installed, skipping init")
+    print("⚠️ Taskwarrior not installed, skipping init")
 
 # --------------------------------------------------
 # Optional: copy task definitions from template
@@ -91,7 +88,7 @@ if TEMPLATE_TASKDATA.exists():
         if item.is_file():
             shutil.copy(item, TASKDATA_DIR / item.name)
 else:
-    print("No template taskwarrior data found, continuing")
+    print("⚠️ No template taskwarrior data found, continuing")
 
 # --------------------------------------------------
 # Create fresh stats.json
@@ -99,11 +96,6 @@ else:
 
 stats = {
     "student": STUDENT,
-
-    "profile": {
-        "avatar": "default.png"
-    },
-
     "xp": {
         "total": 0,
         "categories": {
@@ -147,5 +139,5 @@ stats = {
 with open(STUDENT_DIR / "stats.json", "w") as f:
     json.dump(stats, f, indent=2)
 
-print(f" Student created: {STUDENT}")
+print(f"✅ Student created: {STUDENT}")
 sys.exit(0)

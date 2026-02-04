@@ -1,36 +1,42 @@
+#from services.exercises import DAILY_EXERCISES
+#from services.medals import medal_labels
+#from fastapi import FastAPI, Request, Form
+#from fastapi.responses import HTMLResponse, RedirectResponse
+#from fastapi.templating import Jinja2Templates
+#from fastapi.staticfiles import StaticFiles
+#from starlette.middleware.sessions import SessionMiddleware
+#from auth import DATA_DIR as BASE_DIR
+
+#import json
+#import shutil
+#from pathlib import Path
+#import os
+#import sys
+#from datetime import date, timedelta
+#import subprocess
+
+
+#from pathlib import Path
+#from auth import load_users, verify_password, update_password
+#from services.attendance import apply_attendance
+
+
+
+
+from webapp.auth import DATA_DIR as BASE_DIR
+from webapp.auth import load_users, verify_password, update_password
+
 from pathlib import Path
 import os
 import sys
 import json
 import shutil
 from datetime import date, timedelta
-from datetime import date as today_date
 import subprocess
 
-# ---------------------------------------------------
-# Load environment FIRST
-# ---------------------------------------------------
-
-from dotenv import load_dotenv
-load_dotenv()
-
-if "PRACTICE_DATA_DIR" not in os.environ:
-    raise RuntimeError("PRACTICE_DATA_DIR environment variable is not set")
-
-DATA_DIR = Path(os.environ["PRACTICE_DATA_DIR"])
-STUDENTS_DIR = DATA_DIR / "students"
-LEADERBOARD_FILE = DATA_DIR / "leaderboard.json"
-
-CODE_DIR = Path(__file__).resolve().parent
-
-# ---------------------------------------------------
-# Import app logic AFTER paths are stable
-# ---------------------------------------------------
-
-from auth import load_users, verify_password, update_password
-from services.exercises import DAILY_EXERCISES
-from services.medals import medal_labels
-from services.attendance import apply_attendance
+from webapp.services.exercises import DAILY_EXERCISES
+from webapp.services.medals import medal_labels
+from webapp.services.attendance import apply_attendance
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -38,19 +44,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-#  DEFINE DERIVED PATHS ONLY AFTER BASE_DIR IS SET
-#STUDENTS_DIR = BASE_DIR / "students"
-#LEADERBOARD_FILE = BASE_DIR / "leaderboard.json"
-
-
-
-CODE_DIR = Path(__file__).resolve().parent
-
-if "PRACTICE_DATA_DIR" not in os.environ:
-    raise RuntimeError("PRACTICE_DATA_DIR environment variable is not set")
-
-DATA_DIR = Path(os.environ["PRACTICE_DATA_DIR"])
-STUDENTS_DIR = DATA_DIR / "students"
+# ✅ DEFINE DERIVED PATHS ONLY AFTER BASE_DIR IS SET
+STUDENTS_DIR = BASE_DIR / "students"
+LEADERBOARD_FILE = BASE_DIR / "leaderboard.json"
 
 
 
@@ -120,7 +116,7 @@ app = FastAPI()
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ["SESSION_SECRET"]
+    secret_key="CHANGE_THIS_SECRET_KEY"
 )
 
 # ---------------------------------------------------
@@ -245,7 +241,8 @@ def admin_attendance_form(request: Request):
         }
     )
 
-
+from datetime import date as today_date
+import json
 
 @app.post("/admin/attendance")
 def admin_attendance_submit(
@@ -273,7 +270,7 @@ def admin_attendance_submit(
         "type": "attendance",
         "name": "Private Lesson",
         "date": today_date.today().isoformat(),
-        "grade": grade,
+        "grade": grade,        
     })
 
     with open(stats_file, "w") as f:
@@ -309,7 +306,7 @@ def remove_student(
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    # Prevent admin removing themselves
+    # 🔒 Prevent admin removing themselves
     if student == request.session.get("user"):
         return RedirectResponse(
             "/admin/dashboard/student-management",
@@ -322,7 +319,7 @@ def remove_student(
         shutil.rmtree(student_dir)
 
     # Remove from auth system
-    from auth import delete_user
+    from webapp.auth import delete_user
     delete_user(student)
 
     return RedirectResponse(
@@ -341,26 +338,37 @@ def add_student(
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    # 1) Create student using environment-aware script
+    # 1) Create student using environment‑aware script
     env = {
         **os.environ,
-        "PRACTICE_DATA_DIR": str(DATA_DIR),
+        "PRACTICE_DATA_DIR": str(BASE_DIR),
     }
 
     result = subprocess.run(
         [
             sys.executable,
-            str(CODE_DIR / "scripts" / "create_student.py"),
+            str(BASE_DIR / "scripts" / "create_student.py"),
             username,
         ],
         env=env,
         capture_output=True,
         text=True,
-        check=True,
     )
 
+    if result.returncode != 0:
+        print("CREATE_STUDENT FAILED")
+        print("STDOUT:", result.stdout)
+        print("STDERR:", result.stderr)
+        raise RuntimeError("create_student.py failed")
+
+    #if result.returncode != 0:
+        #return RedirectResponse(
+            #"/admin/dashboard/student-management",
+            #status_code=302
+        #)
+
     # 2) Add user to auth system
-    from auth import add_user
+    from webapp.auth import add_user
 
     add_user(
         username=username,
@@ -400,7 +408,7 @@ def student_dashboard(request: Request):
     with open(stats_file) as f:
         stats = json.load(f)
 
-    #  STREAK VALIDATION GOES HERE
+    # ✅ STREAK VALIDATION GOES HERE
     modified = validate_streak(stats)
 
     if modified:
@@ -445,35 +453,31 @@ def complete_daily_pad_exercise(
     env = {
         **os.environ,
         "STUDENT": student,
-        "EXERCISE_ID": exercise_name,
-        "PRACTICE_DATA_DIR": str(DATA_DIR),
-        "PYTHONPATH": "/app",
+    "EXERCISE_ID": exercise_name,
+        "PRACTICE_DATA_DIR": str(BASE_DIR),
+        "PYTHONPATH": str(BASE_DIR / "webapp"),
     }
 
     result = subprocess.run(
-    [
-        sys.executable,
-        str(CODE_DIR / "scripts" / "add_pad_xp.py"),
-    ],
-    env={
-        **os.environ,
-        "STUDENT": student,
-        "EXERCISE_ID": exercise_name,
-        "PRACTICE_DATA_DIR": str(DATA_DIR),
-        "PYTHONPATH": str(CODE_DIR),
-    },
-    capture_output=True,
-    text=True,
-    check=True,
-)
+        [
+            sys.executable,
+            str(BASE_DIR / "scripts" / "add_pad_xp.py"),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
 
-    # Re-load stats AFTER XP script
+    # Write history entry
+    from datetime import date
+    import json
+
     stats_file = STUDENTS_DIR / student / "stats.json"
 
     with open(stats_file, "r") as f:
         stats = json.load(f)
 
-    # ONLY streak & history (NO XP TOUCHING)
+    # ✅ INCREMENT STREAK ON PRACTICE
     update_streak_on_practice(stats)
 
     history = stats.setdefault("history", {})
@@ -536,7 +540,7 @@ def student_history(request: Request):
     total_pad = sum(1 for e in recent_events if e["type"] == "pad")
     total_attendance = sum(1 for e in recent_events if e["type"] == "attendance")
 
-    #  FEATURE 2: Total time practiced (LIFETIME)
+    # ✅ FEATURE 2: Total time practiced (LIFETIME)
     total_minutes = 0
     for e in events:
         if e["type"] == "pad":

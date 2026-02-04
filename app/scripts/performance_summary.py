@@ -20,7 +20,7 @@ STUDENT_DIR = Path(f"/srv/practice-data/students/{STUDENT}")
 PERF_FILE = STUDENT_DIR / "performance.json"
 
 if not PERF_FILE.exists():
-    print(f" No performance data for {STUDENT}")
+    print(f"❌ No performance data for {STUDENT}")
     sys.exit(1)
 
 with open(PERF_FILE, "r") as f:
@@ -107,5 +107,5 @@ elif MODE == "difficulty":
         print("\nNo difficulty transitions yet.")
 
 else:
-    print(" Unknown mode")
+    print("❌ Unknown mode")
     sys.exit(1)

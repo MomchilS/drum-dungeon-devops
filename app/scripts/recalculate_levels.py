@@ -34,4 +34,4 @@ stats["level"]["xp_to_next"] = (
 with open(STATS_FILE, "w") as f:
     json.dump(stats, f, indent=2)
 
-print(" Levels recalculated without modifying xp.total")
+print("✅ Levels recalculated without modifying xp.total")

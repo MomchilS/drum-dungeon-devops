@@ -22,7 +22,7 @@ STUDENT_DIR = BASE_DIR / STUDENT
 PERF_FILE = STUDENT_DIR / "performance.json"
 
 if not STUDENT_DIR.exists():
-    print(f" Student '{STUDENT}' not found")
+    print(f"❌ Student '{STUDENT}' not found")
     sys.exit(1)
 
 # ========================
@@ -66,6 +66,6 @@ with open(PERF_FILE, "w") as f:
     json.dump(performance, f, indent=2)
 
 print(
-    f" Logged practice: {STUDENT} | {EXERCISE} | "
+    f"✅ Logged practice: {STUDENT} | {EXERCISE} | "
     f"{START_BPM}→{END_BPM} BPM ({difficulty})"
 )

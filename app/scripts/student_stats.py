@@ -19,7 +19,7 @@ STUDENT_DIR = Path(f"/srv/practice-data/students/{STUDENT}")
 STATS_FILE = STUDENT_DIR / "stats.json"
 
 if not STATS_FILE.exists():
-    print(f" Student '{STUDENT}' not found.")
+    print(f"❌ Student '{STUDENT}' not found.")
     sys.exit(1)
 
 # ========================
@@ -42,7 +42,7 @@ print(f"XP:              {stats['xp']['total']}")
 print(f"Current streak:  {stats['streak']['current']} days")
 print(f"Longest streak:  {stats['streak']['longest']} days")
 
-print("\n Medals Earned", end="")
+print("\n🏅 Medals Earned", end="")
 
 if earned_medals:
     print(f" ({len(earned_medals)})")

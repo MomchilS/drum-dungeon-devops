@@ -53,4 +53,4 @@ leaderboard = {
 with open(OUTPUT_FILE, "w") as f:
     json.dump(leaderboard, f, indent=2)
 
-print(" Leaderboard generated")
+print("✅ Leaderboard generated")

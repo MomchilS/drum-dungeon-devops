@@ -12,6 +12,7 @@ import subprocess
 from app.services.exercises import DAILY_EXERCISES
 from app.services.medals import medal_labels
 from app.services.attendance import apply_attendance
+from app.services.level_utils import recalculate_levels
 from app.auth import add_user
 
 from fastapi import FastAPI, Request, Form
@@ -463,36 +464,40 @@ def complete_daily_pad_exercise(
         return RedirectResponse("/", status_code=302)
 
     student = request.session["username"]
-
-    env = {
-        **os.environ,
-        "STUDENT": student,
-    "EXERCISE_ID": exercise_name,
-        "PRACTICE_DATA_DIR": str(BASE_DIR),
-        "PYTHONPATH": str(BASE_DIR / "webapp"),
-    }
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(BASE_DIR / "scripts" / "add_pad_xp.py"),
-        ],
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-
-    # Write history entry
-    from datetime import date
-
     stats_file = STUDENTS_DIR / student / "stats.json"
 
     with open(stats_file, "r") as f:
         stats = json.load(f)
 
-    # ✅ INCREMENT STREAK ON PRACTICE
+    # --------------------------------------------------
+    # DETERMINE XP FROM EXERCISE CONFIG
+    # --------------------------------------------------
+    xp_gain = 5  # fallback
+    for exercises in DAILY_EXERCISES.values():
+        for ex in exercises:
+            if ex["id"] == exercise_name:
+                xp_gain = ex.get("xp", 5)
+                break
+
+    # --------------------------------------------------
+    # APPLY XP
+    # --------------------------------------------------
+    stats.setdefault("xp", {})
+    stats["xp"].setdefault("categories", {})
+    stats["xp"]["categories"].setdefault("pad_practice", 0)
+
+    stats["xp"]["categories"]["pad_practice"] += xp_gain
+    stats["xp"]["total"] = sum(stats["xp"]["categories"].values())
+
+    # ✅ UPDATE LEVEL STATE (CRITICAL)
+    recalculate_levels(stats)
+
+    # --------------------------------------------------
+    # STREAK + HISTORY
+    # --------------------------------------------------
     update_streak_on_practice(stats)
 
+    from datetime import date
     history = stats.setdefault("history", {})
     events = history.setdefault("events", [])
 

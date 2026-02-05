@@ -590,17 +590,36 @@ def student_history(request: Request):
 
 @app.get("/leaderboard", response_class=HTMLResponse)
 def leaderboard_view(request: Request):
-    if not request.session.get("user"):
+    if not request.session.get("username"):
         return RedirectResponse("/", status_code=302)
 
-    if LEADERBOARD_FILE.exists():
-        with open(LEADERBOARD_FILE) as f:
-            data = json.load(f)
-            students = data.get("students", [])
-    else:
-        students = []
+    students = []
+
+    if STUDENTS_DIR.exists():
+        for student_dir in STUDENTS_DIR.iterdir():
+            if not student_dir.is_dir():
+                continue
+
+            stats_file = student_dir / "stats.json"
+            if not stats_file.exists():
+                continue
+
+            with open(stats_file) as f:
+                stats = json.load(f)
+
+            students.append({
+                "username": student_dir.name,
+                "xp": stats.get("xp", {}).get("total", 0),
+                "level": stats.get("level", {}).get("current", 1),
+            })
+
+    # ✅ Sort by XP descending
+    students.sort(key=lambda s: s["xp"], reverse=True)
 
     return templates.TemplateResponse(
         "leaderboard.html",
-        {"request": request, "students": students},
+        {
+            "request": request,
+            "students": students,
+        },
     )

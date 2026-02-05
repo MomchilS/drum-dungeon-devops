@@ -98,7 +98,6 @@
             color: #000;
             text-decoration: none;
         }
-
     </style>
 </head>
 
@@ -115,12 +114,16 @@
                 <div class="row">
                     <div class="left">
                         <div class="rank">#{{ loop.index }}</div>
-                        <div class="name">{{ student.name }}</div>
+                        <div class="name">{{ student.username }}</div>
                     </div>
                     <div class="right">
-                        {{ student.xp_total }} XP<br>
+                        {{ student.xp }} XP<br>
                         {{ student.streak }} Streaks
                     </div>
+                </div>
+            {% else %}
+                <div class="row">
+                    No students yet
                 </div>
             {% endfor %}
         </div>

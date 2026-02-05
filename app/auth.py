@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 from passlib.context import CryptContext
-
+from app.config import PRACTICE_DATA_DIR
 
 # ------------------------------------------------------------------
 # Enforce explicit data directory (no silent fallback)
@@ -11,8 +11,7 @@ from passlib.context import CryptContext
 if "PRACTICE_DATA_DIR" not in os.environ:
     raise RuntimeError("PRACTICE_DATA_DIR environment variable is not set")
 
-BASE_DIR = Path(os.environ["PRACTICE_DATA_DIR"])
-USERS_FILE = BASE_DIR / "users.json"
+USERS_FILE = PRACTICE_DATA_DIR / "users.json"
 
 # ------------------------------------------------------------------
 # Password hashing configuration
@@ -80,4 +79,4 @@ def add_user(username: str, password: str, role: str, force_change: bool):
         json.dump(users, f, indent=2)
 
 
-DATA_DIR = BASE_DIR
+DATA_DIR = PRACTICE_DATA_DIR

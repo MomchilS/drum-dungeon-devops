@@ -1,13 +1,11 @@
-from app.auth import DATA_DIR as BASE_DIR
 from app.auth import load_users, verify_password, update_password
+from app.config import PRACTICE_DATA_DIR
 
 from pathlib import Path
 import os
-import sys
 import json
 import shutil
 from datetime import date, timedelta
-import subprocess
 
 from app.services.exercises import DAILY_EXERCISES
 from app.services.medals import medal_labels
@@ -23,10 +21,10 @@ from fastapi import Form, Request
 from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-# DEFINE DERIVED PATHS ONLY AFTER BASE_DIR IS SET
-STUDENTS_DIR = BASE_DIR / "students"
+# DEFINE DERIVED PATHS ONLY AFTER PRACTICE_DATA_DIR IS SET
+STUDENTS_DIR = PRACTICE_DATA_DIR / "students"
 STUDENTS_DIR.mkdir(parents=True, exist_ok=True)
-LEADERBOARD_FILE = BASE_DIR / "leaderboard.json"
+LEADERBOARD_FILE = PRACTICE_DATA_DIR / "leaderboard.json"
 
 
 

@@ -5,6 +5,7 @@ from datetime import datetime
 
 from app.services.level_utils import recalculate_levels
 from app.services.medals import check_and_award_medals
+from app.services.db_operations import get_db_session, sync_student_data_to_db
 
 
 # --------------------------------------------------
@@ -98,7 +99,21 @@ def apply_attendance(student: str, date_str: str):
     stats["history"]["last_updated"] = datetime.utcnow().isoformat()
 
     # --------------------------------------------------
-    # SAVE
+    # SAVE TO JSON
     # --------------------------------------------------
     with open(stats_file, "w") as f:
         json.dump(stats, f, indent=2)
+
+    # --------------------------------------------------
+    # DUAL-WRITE: SYNC TO DATABASE
+    # --------------------------------------------------
+    db = get_db_session()
+    if db is not None:
+        try:
+            sync_student_data_to_db(db, student, stats)
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Failed to sync attendance to database: {e}")
+            db.rollback()
+        finally:
+            db.close()

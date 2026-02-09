@@ -1,5 +1,6 @@
 from app.auth import load_users, verify_password, update_password
 from app.config import PRACTICE_DATA_DIR
+from app.database import _load_database
 
 from pathlib import Path
 import os
@@ -11,6 +12,8 @@ from app.services.exercises import DAILY_EXERCISES
 from app.services.medals import medal_labels
 from app.services.attendance import apply_attendance
 from app.services.level_utils import recalculate_levels
+from app.services.db_operations import get_db_session, sync_student_data_to_db, create_or_update_student
+from app.services.data_reader import get_users, get_student_stats, get_all_students, get_leaderboard_data
 from app.auth import add_user
 
 from fastapi import FastAPI, Request, Form
@@ -26,7 +29,8 @@ STUDENTS_DIR = PRACTICE_DATA_DIR / "students"
 STUDENTS_DIR.mkdir(parents=True, exist_ok=True)
 LEADERBOARD_FILE = PRACTICE_DATA_DIR / "leaderboard.json"
 
-
+# Initialize database connection
+_load_database()
 
 def format_minutes(total_minutes: int) -> str:
     if total_minutes < 60:
@@ -124,7 +128,7 @@ def login_page(request: Request):
 
 @app.post("/login")
 def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    users = load_users()
+    users = get_users()
     user = users.get(username)
 
     if not user or not verify_password(password, user["password"]):
@@ -272,6 +276,20 @@ def admin_attendance_submit(
     with open(stats_file, "w") as f:
         json.dump(stats, f, indent=2)
 
+    # --------------------------------------------------
+    # DUAL-WRITE: Sync to database
+    # --------------------------------------------------
+    db = get_db_session()
+    if db is not None:
+        try:
+            sync_student_data_to_db(db, student, stats)
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Failed to sync attendance history to database: {e}")
+            db.rollback()
+        finally:
+            db.close()
+
     return RedirectResponse(
         "/admin/attendance",
         status_code=302
@@ -399,6 +417,20 @@ def add_student(
             json.dump(stats, f, indent=2)
 
     # ------------------------------------------------------------------
+    # 4. DUAL-WRITE: Create student in database
+    # ------------------------------------------------------------------
+    db = get_db_session()
+    if db is not None:
+        try:
+            create_or_update_student(db, username, name, avatar)
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Failed to create student in database: {e}")
+            db.rollback()
+        finally:
+            db.close()
+
+    # ------------------------------------------------------------------
     # 4. Redirect back to student management
     # ------------------------------------------------------------------
     return RedirectResponse(
@@ -416,15 +448,29 @@ def student_dashboard(request: Request):
         return RedirectResponse("/", status_code=302)
 
     student = request.session["username"]
-    stats_file = STUDENTS_DIR / student / "stats.json"
+    stats = get_student_stats(student)
 
-    with open(stats_file) as f:
-        stats = json.load(f)
+    if stats is None:
+        return RedirectResponse("/", status_code=302)
 
     # ✅ STREAK VALIDATION GOES HERE
     modified = validate_streak(stats)
 
     if modified:
+        # Update the stats in both DB and JSON
+        db = get_db_session()
+        if db is not None:
+            try:
+                sync_student_data_to_db(db, student, stats)
+                db.commit()
+            except Exception as e:
+                print(f"Warning: Failed to sync streak validation to database: {e}")
+                db.rollback()
+            finally:
+                db.close()
+
+        # Also update JSON backup
+        stats_file = STUDENTS_DIR / student / "stats.json"
         with open(stats_file, "w") as f:
             json.dump(stats, f, indent=2)
 
@@ -508,6 +554,20 @@ def complete_daily_pad_exercise(
     with open(stats_file, "w") as f:
         json.dump(stats, f, indent=2)
 
+    # --------------------------------------------------
+    # DUAL-WRITE: Sync to database
+    # --------------------------------------------------
+    db = get_db_session()
+    if db is not None:
+        try:
+            sync_student_data_to_db(db, student, stats)
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Failed to sync exercise completion to database: {e}")
+            db.rollback()
+        finally:
+            db.close()
+
     return RedirectResponse(
         "/student/dashboard",
         status_code=302
@@ -520,13 +580,10 @@ def student_history(request: Request):
         return RedirectResponse("/", status_code=302)
 
     student = request.session["username"]
-    stats_file = STUDENTS_DIR / student / "stats.json"
+    stats = get_student_stats(student)
 
-    if not stats_file.exists():
+    if stats is None:
         return RedirectResponse("/student/dashboard", status_code=302)
-
-    with open(stats_file, "r") as f:
-        stats = json.load(f)
 
     events = stats.get("history", {}).get("events", [])
 
@@ -591,28 +648,7 @@ def leaderboard_view(request: Request):
     if not request.session.get("username"):
         return RedirectResponse("/", status_code=302)
 
-    students = []
-
-    if STUDENTS_DIR.exists():
-        for student_dir in STUDENTS_DIR.iterdir():
-            if not student_dir.is_dir():
-                continue
-
-            stats_file = student_dir / "stats.json"
-            if not stats_file.exists():
-                continue
-
-            with open(stats_file) as f:
-                stats = json.load(f)
-
-            students.append({
-                "username": student_dir.name,
-                "xp": stats.get("xp", {}).get("total", 0),
-                "level": stats.get("level", {}).get("current", 1),
-            })
-
-    # ✅ Sort by XP descending
-    students.sort(key=lambda s: s["xp"], reverse=True)
+    students = get_leaderboard_data()
 
     return templates.TemplateResponse(
         "leaderboard.html",

@@ -4,6 +4,15 @@ from pathlib import Path
 from passlib.context import CryptContext
 from app.config import PRACTICE_DATA_DIR
 
+# Import database components conditionally
+try:
+    from app.database import SessionLocal, User, DB_AVAILABLE
+except ImportError:
+    # Handle case where database module fails to import
+    SessionLocal = None
+    User = None
+    DB_AVAILABLE = False
+
 # ------------------------------------------------------------------
 # Enforce explicit data directory (no silent fallback)
 # ------------------------------------------------------------------
@@ -55,6 +64,18 @@ def update_password(username: str, new_password: str):
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
 
+    # Dual-write to DB (only if available)
+    if DB_AVAILABLE and SessionLocal is not None:
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.username == username).first()
+            if user:
+                user.password = hash_password(new_password)
+                user.force_change = False
+                db.commit()
+        finally:
+            db.close()
+
 def delete_user(username: str):
     users = load_users()
 
@@ -63,6 +84,17 @@ def delete_user(username: str):
 
         with open(USERS_FILE, "w") as f:
             json.dump(users, f, indent=2)
+
+    # Dual-write to DB (only if available)
+    if DB_AVAILABLE and SessionLocal is not None:
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.username == username).first()
+            if user:
+                db.delete(user)
+                db.commit()
+        finally:
+            db.close()
 
 def add_user(username: str, password: str, role: str, force_change: bool):
     users = load_users()
@@ -77,6 +109,21 @@ def add_user(username: str, password: str, role: str, force_change: bool):
 
     with open(USERS_FILE, "w") as f:
         json.dump(users, f, indent=2)
+
+    # Dual-write to DB (only if available)
+    if DB_AVAILABLE and SessionLocal is not None:
+        db = SessionLocal()
+        try:
+            user = User(
+                username=username,
+                password=hashed_password,
+                role=role,
+                force_change=force_change
+            )
+            db.add(user)
+            db.commit()
+        finally:
+            db.close()
 
 
 DATA_DIR = PRACTICE_DATA_DIR

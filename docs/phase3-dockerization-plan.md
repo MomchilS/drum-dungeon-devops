@@ -218,11 +218,11 @@ Add `healthcheck` to the app (and DB) service so Compose knows when the service 
 ## Order of work (checklist)
 
 - [x] **3.1** Create Dockerfile in `docker/` (base image, install deps, copy app, CMD).
-- [ ] **3.2** Create .dockerignore.
-- [ ] **3.3** Run app container only, using host MariaDB.
-- [ ] **3.4** Add docker-compose.yml (app + db, env, volumes).
-- [ ] **3.5** Add healthchecks to docker-compose.
-- [ ] **3.6** Document and test full flow.
+- [x] **3.2** Create .dockerignore.
+- [x] **3.3** Run app container only, using host MariaDB.
+- [x] **3.4** Add docker-compose.yml (app + db, env, volumes).
+- [x] **3.5** Add healthchecks to docker-compose.
+- [x] **3.6** Document and test full flow.
 
 ---
 

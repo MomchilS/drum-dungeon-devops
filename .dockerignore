@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Environment and secrets (never bake into image)
+.env
+.env.*
+!.env.example
+
+# Local practice data (mounted at runtime, not in image)
+practice_data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docs and dev tools (not needed in container)
+docs/
+*.md
+!README.md
+
+# Tests (optional: include if you run tests in image; exclude to keep image small)
+tests/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+TODO.md
+*.plan.md

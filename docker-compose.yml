@@ -1,0 +1,45 @@
+# Drum Dungeon — App + MariaDB
+# Run from repo root: docker-compose up -d
+# Requires .env with: DB_ROOT_PASSWORD, SESSION_SECRET_KEY (and optionally PRACTICE_DATA_DIR)
+
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: drum_dungeon
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: mysql+pymysql://root:${DB_ROOT_PASSWORD}@db:3306/drum_dungeon
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY}
+      PRACTICE_DATA_DIR: /app/practice_data
+      ENV: ${ENV:-local}
+    volumes:
+      - practice_data:/app/practice_data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  db_data:
+  practice_data:

@@ -5,12 +5,16 @@ Reads from MariaDB primarily, falls back to JSON with logging.
 
 import json
 import os
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import date, datetime
 
 from app.database import DB_AVAILABLE, SessionLocal
+from app.models import User, Student, XP, Attendance, Streak, HistoryEvent
 from app.config import PRACTICE_DATA_DIR
+
+logger = logging.getLogger(__name__)
 
 # Fallback directories
 STUDENTS_DIR = PRACTICE_DATA_DIR / "students"
@@ -19,8 +23,8 @@ USERS_FILE = PRACTICE_DATA_DIR / "users.json"
 
 def log_fallback(message: str):
     """Log when falling back to JSON storage."""
-    print(f"⚠️  DB FALLBACK: {message}")
-    print("   Using JSON backup storage")
+    logger.warning(f"DB FALLBACK: {message}")
+    logger.warning("Using JSON backup storage")
 
 
 def get_users() -> Dict[str, Any]:
@@ -28,7 +32,7 @@ def get_users() -> Dict[str, Any]:
     if DB_AVAILABLE and SessionLocal:
         try:
             db = SessionLocal()
-            users_db = db.query(db.query()._entities[0].class_).all()  # Get User model
+            users_db = db.query(User).all()
             users = {}
             for user in users_db:
                 users[user.username] = {
@@ -56,23 +60,23 @@ def get_student_stats(username: str) -> Optional[Dict[str, Any]]:
             db = SessionLocal()
 
             # Get student
-            student = db.query(db.query()._entities[0].class_).filter_by(username=username).first()
+            student = db.query(Student).filter(Student.username == username).first()
             if not student:
                 db.close()
                 return None
 
             # Get XP
-            xp = db.query(db.query()._entities[1].class_).filter_by(student_id=student.id).first()
+            xp = db.query(XP).filter(XP.student_id == student.id).first()
 
             # Get streak
-            streak = db.query(db.query()._entities[2].class_).filter_by(student_id=student.id).first()
+            streak = db.query(Streak).filter(Streak.student_id == student.id).first()
 
             # Get attendance
-            attendance_records = db.query(db.query()._entities[3].class_).filter_by(student_id=student.id).all()
+            attendance_records = db.query(Attendance).filter(Attendance.student_id == student.id).all()
             attendance_dates = [str(record.date) for record in attendance_records]
 
             # Get history events
-            history_events = db.query(db.query()._entities[4].class_).filter_by(student_id=student.id).all()
+            history_events = db.query(HistoryEvent).filter(HistoryEvent.student_id == student.id).all()
 
             db.close()
 
@@ -147,7 +151,7 @@ def get_all_students() -> List[Dict[str, Any]]:
     if DB_AVAILABLE and SessionLocal:
         try:
             db = SessionLocal()
-            students_db = db.query(db.query()._entities[0].class_).all()
+            students_db = db.query(Student).all()
 
             for student in students_db:
                 stats = get_student_stats(student.username)

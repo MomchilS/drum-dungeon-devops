@@ -6,3 +6,5 @@ passlib[bcrypt]
 itsdangerous
 sqlalchemy
 pymysql
+alembic
+python-dotenv

@@ -1,0 +1,10 @@
+Generic single-database configuration with an async dbapi.
+
+Alembic will create migration files in this directory when you run:
+    alembic revision --autogenerate -m "description"
+
+To apply migrations:
+    alembic upgrade head
+
+To rollback:
+    alembic downgrade -1

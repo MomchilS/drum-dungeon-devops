@@ -1,11 +1,33 @@
+# Load environment variables from .env file if available
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+except ImportError:
+    pass  # python-dotenv not installed, use system env vars
+
+# Load environment variables from .env file FIRST (before any app imports)
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    import os
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+except ImportError:
+    import os
+    from pathlib import Path
+    pass  # python-dotenv not installed, use system env vars
+
 from app.auth import load_users, verify_password, update_password
 from app.config import PRACTICE_DATA_DIR
 from app.database import _load_database
 
-from pathlib import Path
-import os
 import json
 import shutil
+import logging
 from datetime import date, timedelta
 
 from app.services.exercises import DAILY_EXERCISES
@@ -17,7 +39,7 @@ from app.services.data_reader import get_users, get_student_stats, get_all_stude
 from app.auth import add_user
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi import Form, Request
@@ -96,9 +118,17 @@ def validate_streak(stats: dict) -> bool:
 
 app = FastAPI()
 
+# Get session secret from environment variable
+SESSION_SECRET_KEY = os.environ.get("SESSION_SECRET_KEY")
+if not SESSION_SECRET_KEY:
+    raise RuntimeError(
+        "SESSION_SECRET_KEY environment variable is required. "
+        "Generate a secure random key (32+ bytes) and set it in your environment."
+    )
+
 app.add_middleware(
     SessionMiddleware,
-    secret_key="CHANGE_THIS_SECRET_KEY"
+    secret_key=SESSION_SECRET_KEY
 )
 
 # ---------------------------------------------------
@@ -657,3 +687,45 @@ def leaderboard_view(request: Request):
             "students": students,
         },
     )
+
+
+# ---------------------------------------------------
+# Health Check Endpoint
+# ---------------------------------------------------
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for monitoring and load balancers.
+    Returns 200 if healthy, 503 if unhealthy.
+    """
+    from app.database import DB_AVAILABLE, SessionLocal
+    from sqlalchemy import text
+    
+    health_status = {
+        "status": "healthy",
+        "database": "unknown"
+    }
+    
+    status_code = 200
+    
+    # Check database connectivity
+    if DB_AVAILABLE and SessionLocal:
+        try:
+            db = SessionLocal()
+            # Simple query to test connection
+            db.execute(text("SELECT 1"))
+            db.close()
+            health_status["database"] = "connected"
+        except Exception as e:
+            health_status["status"] = "unhealthy"
+            health_status["database"] = f"error: {str(e)}"
+            status_code = 503
+    else:
+        health_status["database"] = "not_configured"
+        # App can still run in JSON-only mode, so this is not necessarily unhealthy
+        health_status["status"] = "degraded"
+        # Still return 200 for degraded (JSON-only mode is acceptable)
+    
+    # Return JSON response with proper status code
+    return JSONResponse(content=health_status, status_code=status_code)

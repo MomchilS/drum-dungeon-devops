@@ -6,7 +6,8 @@ from app.config import PRACTICE_DATA_DIR
 
 # Import database components conditionally
 try:
-    from app.database import SessionLocal, User, DB_AVAILABLE
+    from app.database import SessionLocal, DB_AVAILABLE
+    from app.models import User
 except ImportError:
     # Handle case where database module fails to import
     SessionLocal = None

@@ -52,4 +52,31 @@
 - [x] Document and test full flow (docs/docker-run.md, docs/docker-summary.md)
 - [x] Create initial admin script for fresh DB
 
-**Next:** Phase 4 — Infrastructure (Terraform + Ansible)
+---
+
+## Phase 4 — Infrastructure (Terraform + Ansible) — IN PROGRESS
+
+### 4.1–4.3 Terraform
+- [x] Provider migrated to `bpg/proxmox`
+- [x] Three LXCs on `momo`: `app-staging`, `app-prod`, `db-prod`
+- [x] Outputs for Ansible inventory host/IP mapping
+
+### 4.4–4.8 Ansible
+- [x] Dynamic inventory (`inventory.yml`) pulling Terraform outputs
+- [x] `common` role (apt update, timezone, baseline packages)
+- [x] `database` role (PostgreSQL 17 + `student_db`)
+- [x] `migration` role (upload `students_data` and import into PostgreSQL)
+- [x] `app` role switched to `/opt/app` sync + venv + systemd service
+- [x] vault.example updated for DB credentials and app secrets
+- [x] `playbooks/phase1.yml` orchestrates full deployment
+
+**Runbook commands (Phase 1):**
+1. `cd terraform/proxmox`
+2. `terraform init`
+3. `terraform plan -var-file="secrets.tfvars"`
+4. `terraform apply -var-file="secrets.tfvars" -auto-approve`
+5. `cd ../../ansible`
+6. `ansible-galaxy collection install -r requirements.yml`
+7. `ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass`
+
+**Next:** Phase 5 — CI/CD (GitHub Actions)

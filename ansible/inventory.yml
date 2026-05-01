@@ -1,0 +1,2 @@
+plugin: ansible.builtin.script
+script: ./scripts/terraform_inventory.py

@@ -1,0 +1,42 @@
+---
+- name: Phase 1 baseline
+  hosts: all_phase1
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/all/vault.yml
+  vars:
+    system_timezone: "{{ timezone | default('UTC') }}"
+  roles:
+    - role: common
+      tags: ["common"]
+
+- name: Configure PostgreSQL on db
+  hosts: db
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - role: database
+      tags: ["db"]
+
+- name: Migrate students JSON into PostgreSQL
+  hosts: db
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - role: migration
+      tags: ["migrate"]
+
+- name: Deploy app service
+  hosts: app
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/all/vault.yml
+  roles:
+    - role: app
+      tags: ["app"]

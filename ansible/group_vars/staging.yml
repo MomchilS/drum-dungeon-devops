@@ -1,0 +1,10 @@
+# -----------------------------------------------------------------------------
+# Staging-specific variables (non-secret)
+# -----------------------------------------------------------------------------
+
+app_env: staging
+app_port: 8000
+
+# Repo (for deploy-app)
+repo_url: ""  # set in vault or override, e.g. https://github.com/you/drum-dungeon-devops.git
+repo_branch: main

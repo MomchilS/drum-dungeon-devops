@@ -1,0 +1,17 @@
+---
+# Common setup for all app VMs: Docker + firewall
+# Run: ansible-playbook -i ../inventory/staging.yml common.yml
+#      ansible-playbook -i ../inventory/production.yml common.yml
+
+- name: Common setup (Docker, firewall)
+  hosts: all
+  become: true
+  tasks:
+    - name: Include Docker role
+      ansible.builtin.include_role:
+        name: docker
+
+    - name: Include firewall role (UFW)
+      ansible.builtin.include_role:
+        name: firewall
+      when: ansible_facts.services['ufw.service'] is defined

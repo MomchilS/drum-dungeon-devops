@@ -1,0 +1,11 @@
+# -----------------------------------------------------------------------------
+# Copy to vault.yml, fill in real values, then encrypt:
+#   cp vault.example.yml vault.yml
+#   # edit vault.yml with real secrets
+#   ansible-vault encrypt vault.yml
+# Run playbooks with: --ask-vault-pass
+# -----------------------------------------------------------------------------
+
+db_user: "student_app"
+db_password: "CHANGE_ME_PRODUCTION_DB_PASSWORD"
+session_secret_key: "CHANGE_ME_PRODUCTION_SESSION_SECRET_32CHARS"

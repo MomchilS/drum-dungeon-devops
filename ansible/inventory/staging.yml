@@ -1,0 +1,13 @@
+# -----------------------------------------------------------------------------
+# Staging hosts — replace STAGING_VM_IP with the IP from Terraform/Proxmox
+# -----------------------------------------------------------------------------
+
+all:
+  children:
+    staging:
+      hosts:
+        staging_vm:
+          ansible_host: STAGING_VM_IP
+          ansible_user: ubuntu
+      vars:
+        app_env: staging

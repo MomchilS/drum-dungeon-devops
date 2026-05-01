@@ -17,6 +17,22 @@ SessionLocal = None
 
 logger = logging.getLogger(__name__)
 
+def _build_database_url():
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        return database_url
+
+    db_host = os.environ.get("DB_HOST")
+    db_port = os.environ.get("DB_PORT", "5432")
+    db_name = os.environ.get("DB_NAME")
+    db_user = os.environ.get("DB_USER")
+    db_pass = os.environ.get("DB_PASS")
+
+    if all([db_host, db_name, db_user, db_pass]):
+        return f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+
+    return None
+
 
 def _load_database():
     """Load database components only when explicitly called."""
@@ -26,8 +42,8 @@ def _load_database():
         return
 
     try:
-        # Get DATABASE_URL from environment variable (required)
-        DATABASE_URL = os.environ.get("DATABASE_URL")
+        # Prefer DATABASE_URL, fallback to DB_* environment variables
+        DATABASE_URL = _build_database_url()
         
         if not DATABASE_URL:
             logger.warning("DATABASE_URL environment variable not set. Running in JSON-only mode.")

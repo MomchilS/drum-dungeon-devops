@@ -151,8 +151,9 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse(
+        request,
         "login.html",
-        {"request": request}
+        {"request": request},
     )
 
 
@@ -207,8 +208,9 @@ def change_password_form(request: Request):
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
+        request,
         "change_password.html",
-        {"request": request}
+        {"request": request},
     )
 
 
@@ -237,8 +239,9 @@ def admin_dashboard(request: Request):
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
+        request,
         "admin/dashboard.html",
-        {"request": request}
+        {"request": request},
     )
 
 
@@ -247,11 +250,12 @@ def admin_students(request: Request):
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    students = sorted(d.name for d in STUDENTS_DIR.iterdir() if d.is_dir())
+    students = sorted(s["username"] for s in get_all_students())
 
     return templates.TemplateResponse(
+        request,
         "admin/students_list.html",
-        {"request": request, "students": students}
+        {"request": request, "students": students},
     )
 
 
@@ -260,16 +264,15 @@ def admin_attendance_form(request: Request):
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    students = sorted(
-        d.name for d in STUDENTS_DIR.iterdir() if d.is_dir()
-    )
+    students = sorted(s["username"] for s in get_all_students())
 
     return templates.TemplateResponse(
+        request,
         "admin/attendance.html",
         {
             "request": request,
             "students": students,
-        }
+        },
     )
 
 from datetime import date as today_date
@@ -330,16 +333,15 @@ def admin_student_management(request: Request):
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    students = sorted(
-        d.name for d in STUDENTS_DIR.iterdir() if d.is_dir()
-    )
+    students = sorted(s["username"] for s in get_all_students())
 
     return templates.TemplateResponse(
+        request,
         "admin/student_management.html",
         {
             "request": request,
             "students": students
-        }
+        },
     )
 
 @app.post("/admin/dashboard/student-management/remove")
@@ -505,6 +507,7 @@ def student_dashboard(request: Request):
             json.dump(stats, f, indent=2)
 
     return templates.TemplateResponse(
+        request,
         "student/dashboard.html",
         {
             "request": request,
@@ -521,11 +524,12 @@ def daily_pad_exercises(request: Request):
         return RedirectResponse("/", status_code=302)
 
     return templates.TemplateResponse(
+        request,
         "student/daily_pad_exercises.html",
         {
             "request": request,
             "exercises": DAILY_EXERCISES,
-        }
+        },
     )
 
 
@@ -657,6 +661,7 @@ def student_history(request: Request):
     recent_events = list(reversed(recent_events))
 
     return templates.TemplateResponse(
+        request,
         "student/history.html",
         {
             "request": request,
@@ -664,9 +669,9 @@ def student_history(request: Request):
             "total_pad": total_pad,
             "total_attendance": total_attendance,
             "total_time_practiced": formatted_time,
-        "overall_grade": overall_grade,
+            "overall_grade": overall_grade,
             "longest_streak": stats["streak"]["longest"],
-        }
+        },
     )
 
 # ---------------------------------------------------
@@ -681,6 +686,7 @@ def leaderboard_view(request: Request):
     students = get_leaderboard_data()
 
     return templates.TemplateResponse(
+        request,
         "leaderboard.html",
         {
             "request": request,

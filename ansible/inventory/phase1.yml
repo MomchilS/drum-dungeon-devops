@@ -1,0 +1,19 @@
+all:
+  children:
+    all_phase1:
+      hosts:
+        app-staging:
+          ansible_host: 192.168.2.20
+        app-prod:
+          ansible_host: 192.168.2.21
+        db-prod:
+          ansible_host: 192.168.2.22
+
+    app:
+      hosts:
+        app-staging:
+        app-prod:
+
+    db:
+      hosts:
+        db-prod:

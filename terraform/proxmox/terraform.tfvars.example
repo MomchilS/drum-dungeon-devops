@@ -1,0 +1,16 @@
+proxmox_api_url          = "https://YOUR_PROXMOX_IP:8006/api2/json"
+proxmox_api_token_id     = "user@pam!terraform"
+proxmox_api_token_secret = "your-token-secret"
+proxmox_insecure         = true
+ssh_public_key           = "ssh-ed25519 AAAA... you@example"
+
+proxmox_node   = "momo"
+lxc_template   = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+rootfs_storage = "local-lvm"
+app_rootfs_size_gb = 16
+db_rootfs_size_gb  = 20
+
+# network_bridge = "vmbr0"
+# app_staging_vm_id = 201
+# app_prod_vm_id    = 202
+# db_prod_vm_id     = 203

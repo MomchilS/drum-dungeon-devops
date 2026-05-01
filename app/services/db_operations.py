@@ -4,16 +4,17 @@ Handles writing to MariaDB while keeping JSON as primary read source.
 """
 
 from sqlalchemy.orm import Session
-from app.database import SessionLocal, Student, XP, Attendance, Streak, HistoryEvent, DB_AVAILABLE
+import app.database as database
+from app.models import Student, XP, Attendance, Streak, HistoryEvent
 from datetime import datetime, date
 from typing import Optional
 
 
 def get_db_session():
     """Get a database session."""
-    if not DB_AVAILABLE:
+    if not database.DB_AVAILABLE:
         return None
-    return SessionLocal()
+    return database.SessionLocal()
 
 
 def create_or_update_student(db: Session, username: str, display_name: str = None, avatar: str = None) -> Student:
@@ -100,7 +101,7 @@ def add_history_event(db: Session, student_id: int, event_type: str, name: str, 
 
 def sync_student_data_to_db(db: Session, username: str, stats: dict):
     """Sync complete student data from JSON stats to database."""
-    if not DB_AVAILABLE or db is None:
+    if not database.DB_AVAILABLE or db is None:
         return  # Skip database operations when DB is not available
 
     # Create/update student

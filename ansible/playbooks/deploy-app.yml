@@ -1,0 +1,15 @@
+---
+# Deploy Drum Dungeon app (clone repo, .env, docker compose up)
+# Run: ansible-playbook -i ../inventory/staging.yml deploy-app.yml --ask-vault-pass
+#      ansible-playbook -i ../inventory/production.yml deploy-app.yml --ask-vault-pass
+# Requires: group_vars/production/vault.yml (or staging) with db_root_password, session_secret_key, repo_url
+
+- name: Deploy app
+  hosts: all
+  become: true
+  vars:
+    app_install_dir: /opt/drum-dungeon
+  tasks:
+    - name: Include app role
+      ansible.builtin.include_role:
+        name: app

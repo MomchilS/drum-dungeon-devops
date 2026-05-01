@@ -1,0 +1,97 @@
+---
+- name: Add PostgreSQL apt keyring directory
+  ansible.builtin.file:
+    path: /usr/share/postgresql-common/pgdg
+    state: directory
+    mode: "0755"
+
+- name: Install APT GPG prerequisites
+  ansible.builtin.apt:
+    name:
+      - gpg
+      - ca-certificates
+      - apt-transport-https
+    state: present
+
+- name: Download PostgreSQL repository signing key
+  ansible.builtin.get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+    mode: "0644"
+
+- name: Configure PostgreSQL apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    filename: pgdg
+    state: present
+
+- name: Install PostgreSQL 17 packages
+  ansible.builtin.apt:
+    update_cache: true
+    name:
+      - postgresql-17
+      - postgresql-client-17
+      - python3-psycopg2
+    state: present
+
+- name: Ensure PostgreSQL service is enabled
+  ansible.builtin.systemd:
+    name: postgresql
+    enabled: true
+    state: started
+
+- name: Allow listening on all interfaces
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/17/main/postgresql.conf
+    regexp: "^#?listen_addresses\\s*="
+    line: "listen_addresses = '*'"
+  notify: Restart PostgreSQL
+
+- name: Allow app staging host
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/17/main/pg_hba.conf
+    line: "host    {{ db_name }}    {{ db_user }}    {{ app_staging_ip }}/32    scram-sha-256"
+    insertafter: EOF
+  when: app_staging_ip is defined and app_staging_ip | length > 0
+  notify: Restart PostgreSQL
+
+- name: Allow app prod host
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/17/main/pg_hba.conf
+    line: "host    {{ db_name }}    {{ db_user }}    {{ app_prod_ip }}/32    scram-sha-256"
+    insertafter: EOF
+  when: app_prod_ip is defined and app_prod_ip | length > 0
+  notify: Restart PostgreSQL
+
+- name: Ensure database user exists
+  become: true
+  become_method: su
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    encrypted: true
+    state: present
+
+- name: Ensure student_db exists
+  become: true
+  become_method: su
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: "{{ db_name }}"
+    owner: "{{ db_user }}"
+    template: template0
+    encoding: UTF8
+    state: present
+
+- name: Ensure public schema grants are in place
+  become: true
+  become_method: su
+  become_user: postgres
+  community.postgresql.postgresql_privs:
+    db: "{{ db_name }}"
+    type: schema
+    objs: public
+    roles: "{{ db_user }}"
+    privs: ALL
+

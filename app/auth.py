@@ -6,13 +6,12 @@ from app.config import PRACTICE_DATA_DIR
 
 # Import database components conditionally
 try:
-    from app.database import SessionLocal, DB_AVAILABLE
+    import app.database as database
     from app.models import User
 except ImportError:
     # Handle case where database module fails to import
-    SessionLocal = None
+    database = None
     User = None
-    DB_AVAILABLE = False
 
 # ------------------------------------------------------------------
 # Enforce explicit data directory (no silent fallback)
@@ -66,8 +65,8 @@ def update_password(username: str, new_password: str):
         json.dump(users, f, indent=2)
 
     # Dual-write to DB (only if available)
-    if DB_AVAILABLE and SessionLocal is not None:
-        db = SessionLocal()
+    if database and database.DB_AVAILABLE and database.SessionLocal is not None:
+        db = database.SessionLocal()
         try:
             user = db.query(User).filter(User.username == username).first()
             if user:
@@ -87,8 +86,8 @@ def delete_user(username: str):
             json.dump(users, f, indent=2)
 
     # Dual-write to DB (only if available)
-    if DB_AVAILABLE and SessionLocal is not None:
-        db = SessionLocal()
+    if database and database.DB_AVAILABLE and database.SessionLocal is not None:
+        db = database.SessionLocal()
         try:
             user = db.query(User).filter(User.username == username).first()
             if user:
@@ -112,8 +111,8 @@ def add_user(username: str, password: str, role: str, force_change: bool):
         json.dump(users, f, indent=2)
 
     # Dual-write to DB (only if available)
-    if DB_AVAILABLE and SessionLocal is not None:
-        db = SessionLocal()
+    if database and database.DB_AVAILABLE and database.SessionLocal is not None:
+        db = database.SessionLocal()
         try:
             user = User(
                 username=username,

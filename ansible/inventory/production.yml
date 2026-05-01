@@ -1,0 +1,13 @@
+# -----------------------------------------------------------------------------
+# Production hosts — replace PROD_VM_IP with the IP from Terraform/Proxmox
+# -----------------------------------------------------------------------------
+
+all:
+  children:
+    production:
+      hosts:
+        prod_vm:
+          ansible_host: PROD_VM_IP
+          ansible_user: ubuntu
+      vars:
+        app_env: production

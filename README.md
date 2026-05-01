@@ -11,12 +11,11 @@ Drum Dungeon is a browser-based game (webapp) hosted on a VM on a Proxmox node. 
 | Component | Role |
 |-----------|------|
 | **FastAPI** | Web framework for the game (API + templates). |
-| **MariaDB** | Persistent storage for users, students, XP, attendance, streaks, history (replacing JSON-only over time). |
+| **PostgreSQL 17** | Persistent storage for users, students, XP, attendance, streaks, history. |
 | **Alembic** | Database migrations so schema changes are versioned and repeatable. |
 | **Environment variables** | All config and secrets (paths, `DATABASE_URL`, `SESSION_SECRET_KEY`, etc.) so the same code runs locally, in Docker, and on VMs. |
-| **Docker** | Run app and DB in containers; same image runs anywhere. |
-| **Docker Compose** | One command to run app + MariaDB with healthchecks and volumes. |
-| **(Planned)** Terraform + Ansible | Provision VMs on Proxmox and deploy the app. |
+| **Terraform (`bpg/proxmox`)** | Provision Proxmox LXCs (`app-staging`, `app-prod`, `db-prod`) on `momo`. |
+| **Ansible** | Configure baseline OS, PostgreSQL, JSON migration, and app systemd service. |
 | **(Planned)** GitHub Actions | CI (tests, lint) and CD (deploy to staging/prod) with optional manual approval for prod. |
 | **(Planned)** Monitoring & backups | Observability and data safety. |
 
@@ -34,7 +33,7 @@ Drum Dungeon is a browser-based game (webapp) hosted on a VM on a Proxmox node. 
   Dockerfile, `.dockerignore`, docker-compose (app + MariaDB), healthchecks, docs and tests. *(Done.)*
 
 - **Phase 4 — Infrastructure**  
-  Terraform (Proxmox VMs, tags, outputs), Ansible (inventory, playbooks, roles, vault for secrets).
+  Terraform (Proxmox LXCs + outputs), Ansible (inventory from Terraform, playbooks, roles, vault).
 
 - **Phase 5 — CI/CD**  
   GitHub Actions: CI on PR, deploy to staging on push to main, deploy to prod (manual or tag), zero-downtime strategy.
@@ -49,8 +48,9 @@ Drum Dungeon is a browser-based game (webapp) hosted on a VM on a Proxmox node. 
 
 ## Current Status
 
-- **Phases 2.4, 2.5, 3** are complete: app runs with MariaDB, env-based config, Docker image, and Compose (app + DB). See [docs/docker-summary.md](docs/docker-summary.md) and [docs/docker-run.md](docs/docker-run.md) for the Docker workflow.
-- **Next:** Phase 4 (Terraform + Ansible).
+- **Phases 2.4, 2.5, 3** are complete: env-based app config and containerized workflow are available.
+- **Phase 4 (Phase 1 automation)** now includes Terraform LXC provisioning and Ansible roles for common/database/migration/app.
+- **Next:** Phase 5 (GitHub Actions CI/CD pipeline wiring).
 
 ---
 
@@ -59,11 +59,13 @@ Drum Dungeon is a browser-based game (webapp) hosted on a VM on a Proxmox node. 
 ```
 drum-dungeon-devops/
 ├── app/                    # FastAPI application
-├── alembic/                 # Database migrations
-├── docker/                  # Dockerfile
-├── docs/                    # Documentation (incl. Docker and phase plans)
-├── docker-compose.yml       # App + MariaDB
-├── .env.example             # Env template
+├── alembic/                # Database migrations
+├── docker/                 # Dockerfile
+├── docker-compose.yml      # Local app + DB workflow
+├── terraform/proxmox/      # Proxmox LXCs (app-staging, app-prod, db-prod)
+├── ansible/                # Inventory + playbooks + roles (common, database, migration, app)
+├── docs/                   # Documentation and phase plans
+├── .env.example            # Env template
 └── README.md
 ```
 
@@ -71,5 +73,21 @@ drum-dungeon-devops/
 
 ## Quick Links
 
-- **Local run:** `.env` from `.env.example`, `python create_db.py`, `alembic upgrade head`, then run uvicorn from `app/`.
-- **Docker run:** `cp .env.example .env`, set secrets, `docker compose up -d --build`, then create initial admin (see [docs/docker-run.md](docs/docker-run.md)).
+- **Terraform + Ansible (Phase 1):**
+  ```bash
+  cd terraform/proxmox
+  terraform init
+  terraform plan -var-file="secrets.tfvars"
+  terraform apply -var-file="secrets.tfvars" -auto-approve
+  cd ../../ansible
+  ansible-galaxy collection install -r requirements.yml
+  ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass
+  ```
+
+## Phase 4 Completion Notes
+
+- Proxmox LXCs provisioned on node `momo`: `app-staging`, `app-prod`, `db-prod`.
+- PostgreSQL 17 installed and configured on `db-prod` with migrated student/user data.
+- App deployed to `/opt/app` on staging and prod via Ansible, running under `systemd`.
+- Runtime fixes applied for modern FastAPI/Starlette template rendering and DB-aware data reads.
+- Both app nodes now report healthy DB-connected status on `/health`.

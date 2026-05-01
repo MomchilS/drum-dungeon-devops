@@ -1,0 +1,2 @@
+---
+# Defaults for docker role (override in group_vars or playbook if needed)

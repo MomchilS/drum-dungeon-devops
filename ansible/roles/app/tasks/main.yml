@@ -1,0 +1,65 @@
+---
+- name: Ensure app directory exists
+  ansible.builtin.file:
+    path: "{{ app_install_dir }}"
+    state: directory
+    owner: "{{ app_owner }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Sync project code to app hosts
+  become: false
+  ansible.posix.synchronize:
+    src: "{{ project_root }}/"
+    dest: "{{ app_install_dir }}/"
+    delete: true
+    recursive: true
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=.venv"
+      - "--exclude=.env"
+      - "--exclude=terraform/.terraform"
+      - "--exclude=**/*.tfstate"
+      - "--exclude=students_data"
+  delegate_to: localhost
+
+- name: Ensure Python runtime packages are present
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-venv
+      - python3-pip
+    state: present
+
+- name: Create Python virtual environment
+  ansible.builtin.command:
+    cmd: "python3 -m venv {{ app_install_dir }}/.venv"
+    creates: "{{ app_install_dir }}/.venv/bin/activate"
+
+- name: Install application dependencies
+  ansible.builtin.pip:
+    requirements: "{{ app_install_dir }}/app/requirements.txt"
+    virtualenv: "{{ app_install_dir }}/.venv"
+
+- name: Deploy app environment file
+  ansible.builtin.template:
+    src: app.env.j2
+    dest: "{{ app_install_dir }}/.env"
+    owner: "{{ app_owner }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+
+- name: Deploy systemd unit
+  ansible.builtin.template:
+    src: drum-dungeon.service.j2
+    dest: /etc/systemd/system/drum-dungeon.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart Drum Dungeon
+
+- name: Ensure Drum Dungeon service is enabled and started
+  ansible.builtin.systemd:
+    name: drum-dungeon
+    enabled: true
+    state: started

@@ -1,0 +1,16 @@
+[Unit]
+Description=Drum Dungeon FastAPI service
+After=network.target
+
+[Service]
+Type=simple
+User={{ app_owner }}
+Group={{ app_group }}
+WorkingDirectory={{ app_install_dir }}
+EnvironmentFile={{ app_install_dir }}/.env
+ExecStart={{ app_install_dir }}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port {{ app_port }}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

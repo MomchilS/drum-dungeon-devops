@@ -1,0 +1,9 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart Drum Dungeon
+  ansible.builtin.systemd:
+    name: drum-dungeon
+    state: restarted

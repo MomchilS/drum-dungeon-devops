@@ -9,6 +9,20 @@ __pycache__/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Local practice data
 practice_data/
+
+# Terraform
+terraform/**/.terraform/
+terraform/**/.terraform.lock.hcl
+*.tfvars
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/*.tfplan
+terraform/**/.terraform.tfstate.lock.info
+
+# Ansible vault secrets
+ansible/group_vars/**/vault.yml

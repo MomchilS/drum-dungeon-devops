@@ -1,0 +1,7 @@
+# -----------------------------------------------------------------------------
+# Copy to vault.yml, fill in, then: ansible-vault encrypt vault.yml
+# -----------------------------------------------------------------------------
+
+db_user: "student_app"
+db_password: "CHANGE_ME_STAGING_DB_PASSWORD"
+session_secret_key: "CHANGE_ME_STAGING_SESSION_SECRET_32CHARS"

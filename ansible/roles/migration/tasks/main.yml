@@ -1,0 +1,46 @@
+---
+- name: Ensure migration working directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/migration
+    - /opt/students_data
+
+- name: Upload students_data folder to db host
+  become: false
+  ansible.posix.synchronize:
+    src: "{{ students_data_src }}/"
+    dest: /opt/students_data/
+    delete: false
+    recursive: true
+  delegate_to: localhost
+
+- name: Upload migration script
+  ansible.builtin.copy:
+    src: migrate_students_data.py
+    dest: /opt/migration/migrate_students_data.py
+    mode: "0755"
+
+- name: Install psycopg2 driver for migration
+  ansible.builtin.apt:
+    name: python3-psycopg2
+    state: present
+
+- name: Run JSON to PostgreSQL migration
+  ansible.builtin.command:
+    cmd: >
+      python3 /opt/migration/migrate_students_data.py
+      --data-dir /opt/students_data
+      --db-host {{ migration_db_host | default('127.0.0.1') }}
+      --db-port {{ db_port }}
+      --db-name {{ db_name }}
+      --db-user {{ db_user }}
+      --db-pass {{ db_password }}
+  register: migration_run
+  changed_when: true
+
+- name: Show migration summary
+  ansible.builtin.debug:
+    var: migration_run.stdout_lines

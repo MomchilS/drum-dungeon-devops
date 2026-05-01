@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import date, datetime
 
-from app.database import DB_AVAILABLE, SessionLocal
+import app.database as database
 from app.models import User, Student, XP, Attendance, Streak, HistoryEvent
 from app.config import PRACTICE_DATA_DIR
 
@@ -29,9 +29,9 @@ def log_fallback(message: str):
 
 def get_users() -> Dict[str, Any]:
     """Get users - try MariaDB first, then JSON."""
-    if DB_AVAILABLE and SessionLocal:
+    if database.DB_AVAILABLE and database.SessionLocal:
         try:
-            db = SessionLocal()
+            db = database.SessionLocal()
             users_db = db.query(User).all()
             users = {}
             for user in users_db:
@@ -55,9 +55,9 @@ def get_users() -> Dict[str, Any]:
 
 def get_student_stats(username: str) -> Optional[Dict[str, Any]]:
     """Get student stats - try MariaDB first, then JSON."""
-    if DB_AVAILABLE and SessionLocal:
+    if database.DB_AVAILABLE and database.SessionLocal:
         try:
-            db = SessionLocal()
+            db = database.SessionLocal()
 
             # Get student
             student = db.query(Student).filter(Student.username == username).first()
@@ -148,9 +148,9 @@ def get_all_students() -> List[Dict[str, Any]]:
     """Get all students with their stats - try MariaDB first, then JSON."""
     students = []
 
-    if DB_AVAILABLE and SessionLocal:
+    if database.DB_AVAILABLE and database.SessionLocal:
         try:
-            db = SessionLocal()
+            db = database.SessionLocal()
             students_db = db.query(Student).all()
 
             for student in students_db:

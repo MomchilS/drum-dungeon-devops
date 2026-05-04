@@ -22,6 +22,8 @@
       - "--exclude=**/*.tfstate"
       - "--exclude=students_data"
   delegate_to: localhost
+  notify:
+    - Restart Drum Dungeon
 
 - name: Ensure Python runtime packages are present
   ansible.builtin.apt:

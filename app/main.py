@@ -34,7 +34,12 @@ from app.services.exercises import DAILY_EXERCISES
 from app.services.medals import medal_labels
 from app.services.attendance import apply_attendance
 from app.services.level_utils import recalculate_levels
-from app.services.db_operations import get_db_session, sync_student_data_to_db, create_or_update_student
+from app.services.db_operations import (
+    get_db_session,
+    sync_student_data_to_db,
+    create_or_update_student,
+    delete_student,
+)
 from app.services.data_reader import get_users, get_student_stats, get_all_students, get_leaderboard_data
 from app.auth import add_user
 
@@ -352,8 +357,8 @@ def remove_student(
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    # 🔒 Prevent admin removing themselves
-    if student == request.session.get("user"):
+    # Prevent admin from removing their own account.
+    if student == request.session.get("username"):
         return RedirectResponse(
             "/admin/dashboard/student-management",
             status_code=302
@@ -367,6 +372,18 @@ def remove_student(
     # Remove from auth system
     from app.auth import delete_user
     delete_user(student)
+
+    # Remove from DB student domain tables to avoid ghost records.
+    db = get_db_session()
+    if db is not None:
+        try:
+            delete_student(db, student)
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Failed to delete student data from database: {e}")
+            db.rollback()
+        finally:
+            db.close()
 
     return RedirectResponse(
         "/admin/dashboard/student-management",

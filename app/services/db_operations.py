@@ -37,6 +37,15 @@ def create_or_update_student(db: Session, username: str, display_name: str = Non
     return student
 
 
+def delete_student(db: Session, username: str) -> bool:
+    """Delete a student and related child rows via FK cascades."""
+    student = db.query(Student).filter(Student.username == username).first()
+    if not student:
+        return False
+    db.delete(student)
+    return True
+
+
 def update_student_xp(db: Session, student_id: int, total: int, pad_practice: int, attendance: int, consistency: int):
     """Update or create XP record for a student."""
     xp = db.query(XP).filter(XP.student_id == student_id).first()

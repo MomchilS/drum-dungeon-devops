@@ -30,7 +30,7 @@ Drum Dungeon is a browser-based game (webapp) hosted on a VM on a Proxmox node. 
   No hardcoded credentials; env vars and `.env.example`. *(Done.)*
 
 - **Phase 3 — Dockerization**  
-  Dockerfile, `.dockerignore`, docker-compose (app + MariaDB), healthchecks, docs and tests. *(Done.)*
+  Dockerfile, `.dockerignore`, docker-compose (app + PostgreSQL 17), healthchecks, docs and tests. *(Done.)*
 
 - **Phase 4 — Infrastructure**  
   Terraform (Proxmox LXCs + outputs), Ansible (inventory from Terraform, playbooks, roles, vault).

@@ -114,14 +114,23 @@ def add_user(username: str, password: str, role: str, force_change: bool):
     if database and database.DB_AVAILABLE and database.SessionLocal is not None:
         db = database.SessionLocal()
         try:
-            user = User(
-                username=username,
-                password=hashed_password,
-                role=role,
-                force_change=force_change
-            )
-            db.add(user)
+            existing_user = db.query(User).filter(User.username == username).first()
+            if existing_user:
+                existing_user.password = hashed_password
+                existing_user.role = role
+                existing_user.force_change = force_change
+            else:
+                user = User(
+                    username=username,
+                    password=hashed_password,
+                    role=role,
+                    force_change=force_change
+                )
+                db.add(user)
             db.commit()
+        except Exception:
+            db.rollback()
+            raise
         finally:
             db.close()
 

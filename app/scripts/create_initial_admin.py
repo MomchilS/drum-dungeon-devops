@@ -9,6 +9,7 @@ Or set INITIAL_ADMIN_PASSWORD in the environment.
 import argparse
 import getpass
 import sys
+import os
 
 
 def main():
@@ -17,7 +18,7 @@ def main():
     parser.add_argument("--password", help="Admin password (or set INITIAL_ADMIN_PASSWORD, or you will be prompted)")
     args = parser.parse_args()
 
-    password = args.password or sys.environ.get("INITIAL_ADMIN_PASSWORD")
+    password = args.password or os.environ.get("INITIAL_ADMIN_PASSWORD")
     if not password:
         if sys.stdin.isatty():
             password = getpass.getpass("Enter admin password: ")

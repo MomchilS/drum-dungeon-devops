@@ -1,4 +1,6 @@
 ---
+# LEGACY PLAYBOOK: kept for reference.
+# Canonical deploy path is playbooks/phase1.yml with inventory/phase1.yml.
 # Deploy Drum Dungeon app (clone repo, .env, docker compose up)
 # Run: ansible-playbook -i ../inventory/staging.yml deploy-app.yml --ask-vault-pass
 #      ansible-playbook -i ../inventory/production.yml deploy-app.yml --ask-vault-pass

@@ -1,4 +1,6 @@
 ---
+# LEGACY PLAYBOOK: kept for reference.
+# Canonical deploy path is playbooks/phase1.yml with inventory/phase1.yml.
 # Common setup for all app VMs: Docker + firewall
 # Run: ansible-playbook -i ../inventory/staging.yml common.yml
 #      ansible-playbook -i ../inventory/production.yml common.yml

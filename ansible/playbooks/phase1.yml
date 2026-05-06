@@ -4,39 +4,52 @@
   become: true
   vars_files:
     - ../group_vars/all.yml
-    - ../group_vars/all/vault.yml
   vars:
     system_timezone: "{{ timezone | default('UTC') }}"
   roles:
     - role: common
       tags: ["common"]
 
-- name: Configure PostgreSQL on db
+- name: Configure PostgreSQL on db (production defaults)
   hosts: db
   become: true
   vars_files:
     - ../group_vars/all.yml
-    - ../group_vars/all/vault.yml
+    - ../group_vars/production.yml
+    - ../group_vars/production/vault.yml
   roles:
     - role: database
       tags: ["db"]
 
-- name: Migrate students JSON into PostgreSQL
+- name: Migrate students JSON into PostgreSQL (production defaults)
   hosts: db
   become: true
   vars_files:
     - ../group_vars/all.yml
-    - ../group_vars/all/vault.yml
+    - ../group_vars/production.yml
+    - ../group_vars/production/vault.yml
   roles:
     - role: migration
       tags: ["migrate"]
 
-- name: Deploy app service
-  hosts: app
+- name: Deploy app service to staging
+  hosts: app-staging
   become: true
   vars_files:
     - ../group_vars/all.yml
-    - ../group_vars/all/vault.yml
+    - ../group_vars/staging.yml
+    - ../group_vars/staging/vault.yml
   roles:
     - role: app
-      tags: ["app"]
+      tags: ["app", "staging"]
+
+- name: Deploy app service to production
+  hosts: app-prod
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+    - ../group_vars/production.yml
+    - ../group_vars/production/vault.yml
+  roles:
+    - role: app
+      tags: ["app", "production"]

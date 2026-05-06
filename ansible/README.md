@@ -14,7 +14,15 @@ Phase 1 configures three Proxmox LXCs:
 
 ## Inventory
 
-`inventory.yml` uses `scripts/terraform_inventory.py`, which calls:
+Primary day-to-day deploy commands in this repo use static inventory:
+
+```bash
+-i inventory/phase1.yml
+```
+
+This avoids coupling routine app deploys to local Terraform state output.
+
+`inventory.yml` still exists and uses `scripts/terraform_inventory.py`, which calls:
 
 ```bash
 terraform output -json phase1_inventory_hosts
@@ -24,7 +32,7 @@ That means inventory is pulled from Terraform outputs directly.
 
 ## Secrets (Vault)
 
-Create vault files for staging and production:
+Primary vault structure is environment-specific:
 
 1. `cp group_vars/staging/vault.example.yml group_vars/staging/vault.yml`
 2. `cp group_vars/production/vault.example.yml group_vars/production/vault.yml`
@@ -32,24 +40,40 @@ Create vault files for staging and production:
 4. Encrypt each:
    - `ansible-vault encrypt group_vars/staging/vault.yml`
    - `ansible-vault encrypt group_vars/production/vault.yml`
-4. Run playbooks with `--ask-vault-pass` so Ansible can read the secrets.
+5. Run playbooks with `--ask-vault-pass` so Ansible can read the secrets.
 
 ## Playbooks
 
 From the `ansible` directory:
 
-**Run full Phase 1 automation:**
+**Canonical app deploy workflow (explicit per environment):**
 ```bash
-ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags app --limit app-staging
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags app --limit app-prod
 ```
 
-**Optional targeted runs by tag:**
+**Infrastructure/bootstrap runs (shared DB host):**
 ```bash
-ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass --tags common
-ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass --tags db
-ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass --tags migrate
-ansible-playbook -i inventory.yml playbooks/phase1.yml --ask-vault-pass --tags app
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags common
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags db
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags migrate
 ```
+
+## Validation commands
+
+Use these checks after deploys:
+
+```bash
+ansible -i inventory/phase1.yml app-staging -u root -b -m shell -a "grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|SESSION_SECRET_KEY)=' /opt/app/.env" --ask-vault-pass
+ansible -i inventory/phase1.yml app-prod -u root -b -m shell -a "grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|SESSION_SECRET_KEY)=' /opt/app/.env" --ask-vault-pass
+```
+
+## Legacy playbooks (kept for reference)
+
+The following playbooks are retained but are not the canonical deployment path:
+
+- `playbooks/deploy-app.yml`
+- `playbooks/common.yml`
 
 ## Role summary
 

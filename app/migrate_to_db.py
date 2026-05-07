@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Migration script to import existing JSON data into MariaDB.
-Run this once after setting up the DB.
+Maintenance script to import existing JSON data into PostgreSQL.
+Runtime app code does not use JSON as a data source.
 """
 
 import sys
@@ -125,7 +125,7 @@ def migrate_students():
         db.close()
 
 if __name__ == "__main__":
-    print("Starting migration to MariaDB...")
+    print("Starting JSON import to PostgreSQL...")
     migrate_users()
     migrate_students()
     print("Migration complete!")

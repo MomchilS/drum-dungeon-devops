@@ -1,32 +1,20 @@
-import os
-import json
-from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional
 
 from app.services.level_utils import recalculate_levels
 from app.services.medals import check_and_award_medals
-from app.services.db_operations import get_db_session, sync_student_data_to_db
-
-
-# --------------------------------------------------
-# ENVIRONMENT-AWARE BASE DIR
-# --------------------------------------------------
-BASE_DIR = Path(os.environ.get("PRACTICE_DATA_DIR", "/srv/practice-data"))
-STUDENTS_DIR = BASE_DIR / "students"
+from app.services.data_reader import get_student_stats
+from app.services.db_operations import require_db_session, sync_student_data_to_db
 
 
 ATTENDANCE_XP = 20
 CONSISTENCY_BONUS_XP = 10
 
 
-def apply_attendance(student: str, date_str: str):
-    stats_file = STUDENTS_DIR / student / "stats.json"
-
-    if not stats_file.exists():
+def apply_attendance(student: str, date_str: str, grade: Optional[int] = None):
+    stats = get_student_stats(student)
+    if stats is None:
         raise ValueError(f"Student not found: {student}")
-
-    with open(stats_file, "r") as f:
-        stats = json.load(f)
 
     # --------------------------------------------------
     # ENSURE STRUCTURE (CRITICAL FIX)
@@ -52,7 +40,8 @@ def apply_attendance(student: str, date_str: str):
     categories.setdefault("consistency", 0)
 
     # History
-    stats.setdefault("history", {})
+    history = stats.setdefault("history", {})
+    events = history.setdefault("events", [])
 
     # --------------------------------------------------
     # MONTH ROLLOVER LOGIC (YYYY-MM)
@@ -78,10 +67,7 @@ def apply_attendance(student: str, date_str: str):
     # --------------------------------------------------
     # MONTHLY CONSISTENCY BONUS
     # --------------------------------------------------
-    if (
-        attendance["current_month"]["count"] >= 4
-        and not attendance["current_month"]["bonus_awarded"]
-    ):
+    if attendance["current_month"]["count"] == 4:
         categories["consistency"] += CONSISTENCY_BONUS_XP
         attendance["current_month"]["bonus_awarded"] = True
 
@@ -95,25 +81,24 @@ def apply_attendance(student: str, date_str: str):
     # --------------------------------------------------
     # HISTORY META
     # --------------------------------------------------
-    stats["history"]["last_xp_event"] = "attendance"
-    stats["history"]["last_updated"] = datetime.utcnow().isoformat()
+    events.append({
+        "type": "attendance",
+        "name": "Private Lesson",
+        "date": date_str,
+        "grade": grade,
+    })
+    history["last_xp_event"] = "attendance"
+    history["last_updated"] = datetime.now(timezone.utc).isoformat()
 
     # --------------------------------------------------
-    # SAVE TO JSON
+    # SAVE TO POSTGRESQL
     # --------------------------------------------------
-    with open(stats_file, "w") as f:
-        json.dump(stats, f, indent=2)
-
-    # --------------------------------------------------
-    # DUAL-WRITE: SYNC TO DATABASE
-    # --------------------------------------------------
-    db = get_db_session()
-    if db is not None:
-        try:
-            sync_student_data_to_db(db, student, stats)
-            db.commit()
-        except Exception as e:
-            print(f"Warning: Failed to sync attendance to database: {e}")
-            db.rollback()
-        finally:
-            db.close()
+    db = require_db_session()
+    try:
+        sync_student_data_to_db(db, student, stats)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()

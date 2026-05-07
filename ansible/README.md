@@ -42,6 +42,12 @@ Primary vault structure is environment-specific:
    - `ansible-vault encrypt group_vars/production/vault.yml`
 5. Run playbooks with `--ask-vault-pass` so Ansible can read the secrets.
 
+## Runtime data source
+
+Staging and production app nodes use PostgreSQL as the runtime source of truth.
+JSON is not used as a live fallback for auth, student stats, attendance, XP, or history.
+Existing JSON import/migration scripts are maintenance tools only.
+
 ## Playbooks
 
 From the `ansible` directory:
@@ -79,5 +85,5 @@ The following playbooks are retained but are not the canonical deployment path:
 
 - **common** — Updates apt, sets timezone, and installs baseline packages (`python3-pip`, `libpq-dev`, `git`).
 - **database** — Installs PostgreSQL 17, configures remote access, and creates `student_db`.
-- **migration** — Uploads `students_data` and migrates JSON content into PostgreSQL tables.
+- **migration** — Uploads `students_data` and imports JSON content into PostgreSQL tables as an explicit maintenance/bootstrap step.
 - **app** — Syncs code to `/opt/app`, builds venv, writes env file, and manages app with systemd.

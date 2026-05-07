@@ -1,6 +1,6 @@
 """
-Database module - completely optional for testing.
-Only loads when MariaDB is available.
+PostgreSQL database module.
+Runtime app paths require the database; JSON is not a live fallback.
 """
 
 import os
@@ -46,7 +46,7 @@ def _load_database():
         DATABASE_URL = _build_database_url()
         
         if not DATABASE_URL:
-            logger.warning("DATABASE_URL environment variable not set. Running in JSON-only mode.")
+            logger.error("DATABASE_URL/DB_* environment variables are required for runtime database access.")
             DB_AVAILABLE = False
             return
 
@@ -74,14 +74,13 @@ def _load_database():
         import traceback
         traceback.print_exc()
         logger.warning(f"Database not available: {e}")
-        logger.warning("Running in JSON-only mode for testing")
+        logger.warning("Database unavailable; runtime app requests should fail clearly.")
         DB_AVAILABLE = False
 
 def get_db():
     """FastAPI dependency for database sessions."""
     if not DB_AVAILABLE or SessionLocal is None:
-        # Return a dummy generator when DB is not available
-        return iter([])
+        raise RuntimeError("Database is required for runtime app requests")
     db = SessionLocal()
     try:
         yield db

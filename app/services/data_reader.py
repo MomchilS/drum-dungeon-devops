@@ -1,202 +1,139 @@
 """
-Data reader service with MariaDB-first, JSON-fallback logic.
-Reads from MariaDB primarily, falls back to JSON with logging.
+Data reader service for runtime PostgreSQL reads.
+JSON import/export is handled by explicit maintenance scripts, not live requests.
 """
 
-import json
-import os
-import logging
-from pathlib import Path
 from typing import Dict, List, Optional, Any
-from datetime import date, datetime
 
 import app.database as database
 from app.models import User, Student, XP, Attendance, Streak, HistoryEvent
-from app.config import PRACTICE_DATA_DIR
 
-logger = logging.getLogger(__name__)
-
-# Fallback directories
-STUDENTS_DIR = PRACTICE_DATA_DIR / "students"
-USERS_FILE = PRACTICE_DATA_DIR / "users.json"
-
-
-def log_fallback(message: str):
-    """Log when falling back to JSON storage."""
-    logger.warning(f"DB FALLBACK: {message}")
-    logger.warning("Using JSON backup storage")
+def _require_db_session():
+    if not database.DB_AVAILABLE or not database.SessionLocal:
+        raise RuntimeError("Database is required for runtime data reads")
+    return database.SessionLocal()
 
 
 def get_users() -> Dict[str, Any]:
-    """Get users - try MariaDB first, then JSON."""
-    if database.DB_AVAILABLE and database.SessionLocal:
-        try:
-            db = database.SessionLocal()
-            users_db = db.query(User).all()
-            users = {}
-            for user in users_db:
-                users[user.username] = {
-                    "password": user.password,
-                    "role": user.role,
-                    "force_change": user.force_change
-                }
-            db.close()
-            return users
-        except Exception as e:
-            log_fallback(f"Failed to read users from MariaDB: {e}")
-
-    # Fallback to JSON
-    if USERS_FILE.exists():
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-
-    return {}
+    """Get users from PostgreSQL."""
+    db = _require_db_session()
+    try:
+        users_db = db.query(User).all()
+        return {
+            user.username: {
+                "password": user.password,
+                "role": user.role,
+                "force_change": user.force_change
+            }
+            for user in users_db
+        }
+    finally:
+        db.close()
 
 
 def get_student_stats(username: str) -> Optional[Dict[str, Any]]:
-    """Get student stats - try MariaDB first, then JSON."""
-    if database.DB_AVAILABLE and database.SessionLocal:
-        try:
-            db = database.SessionLocal()
+    """Get student stats from PostgreSQL."""
+    db = _require_db_session()
+    try:
+        student = db.query(Student).filter(Student.username == username).first()
+        if not student:
+            return None
 
-            # Get student
-            student = db.query(Student).filter(Student.username == username).first()
-            if not student:
-                db.close()
-                return None
+        xp = db.query(XP).filter(XP.student_id == student.id).first()
+        streak = db.query(Streak).filter(Streak.student_id == student.id).first()
+        attendance_records = db.query(Attendance).filter(Attendance.student_id == student.id).all()
+        history_events = db.query(HistoryEvent).filter(HistoryEvent.student_id == student.id).all()
 
-            # Get XP
-            xp = db.query(XP).filter(XP.student_id == student.id).first()
+        attendance_dates = [str(record.date) for record in attendance_records]
+        current_month = None
+        current_month_count = 0
+        if attendance_records:
+            latest_month = max(record.date for record in attendance_records).strftime("%Y-%m")
+            current_month = latest_month
+            current_month_count = sum(
+                1 for record in attendance_records
+                if record.date.strftime("%Y-%m") == latest_month
+            )
 
-            # Get streak
-            streak = db.query(Streak).filter(Streak.student_id == student.id).first()
-
-            # Get attendance
-            attendance_records = db.query(Attendance).filter(Attendance.student_id == student.id).all()
-            attendance_dates = [str(record.date) for record in attendance_records]
-
-            # Get history events
-            history_events = db.query(HistoryEvent).filter(HistoryEvent.student_id == student.id).all()
-
-            db.close()
-
-            # Build stats dict
-            stats = {
-                "xp": {
-                    "total": xp.total if xp else 0,
-                    "categories": {
-                        "pad_practice": xp.pad_practice if xp else 0,
-                        "attendance": xp.attendance if xp else 0,
-                        "consistency": xp.consistency if xp else 0
-                    }
-                },
-                "level": {
-                    "current": 1,  # Will be calculated
-                    "progress_xp": 0,
-                    "xp_to_next": 10
-                },
-                "streak": {
-                    "current": streak.current if streak else 0,
-                    "longest": streak.longest if streak else 0,
-                    "last_practice_date": str(streak.last_practice_date) if streak and streak.last_practice_date else None
-                },
-                "attendance": {
-                    "dates": attendance_dates,
-                    "lifetime_lessons": len(attendance_dates),
-                    "current_month": {
-                        "month": None,
-                        "count": 0,
-                        "bonus_awarded": False
-                    }
-                },
-                "profile": {
-                    "name": student.display_name or username,
-                    "avatar": student.avatar or ""
-                },
-                "history": {
-                    "events": [
-                        {
-                            "type": event.type,
-                            "name": event.name or "",
-                            "date": str(event.date),
-                            "grade": event.grade
-                        }
-                        for event in history_events
-                    ]
+        stats = {
+            "xp": {
+                "total": xp.total if xp else 0,
+                "categories": {
+                    "pad_practice": xp.pad_practice if xp else 0,
+                    "attendance": xp.attendance if xp else 0,
+                    "consistency": xp.consistency if xp else 0
                 }
-            }
+            },
+            "level": {
+                "current": 1,
+                "progress_xp": 0,
+                "xp_to_next": 10
+            },
+            "streak": {
+                "current": streak.current if streak else 0,
+                "longest": streak.longest if streak else 0,
+                "last_practice_date": str(streak.last_practice_date) if streak and streak.last_practice_date else None
+            },
+            "attendance": {
+                "dates": attendance_dates,
+                "lifetime_lessons": len(attendance_dates),
+                "current_month": {
+                    "month": current_month,
+                    "count": current_month_count,
+                    "bonus_awarded": False
+                }
+            },
+            "profile": {
+                "name": student.display_name or username,
+                "avatar": student.avatar or ""
+            },
+            "history": {
+                "events": [
+                    {
+                        "type": event.type,
+                        "name": event.name or "",
+                        "date": str(event.date),
+                        "grade": event.grade
+                    }
+                    for event in history_events
+                ]
+            },
+            "medals": []
+        }
 
-            # Recalculate level
-            from app.services.level_utils import recalculate_levels
-            recalculate_levels(stats)
-
-            return stats
-
-        except Exception as e:
-            log_fallback(f"Failed to read student stats for {username} from MariaDB: {e}")
-
-    # Fallback to JSON
-    stats_file = STUDENTS_DIR / username / "stats.json"
-    if stats_file.exists():
-        with open(stats_file, "r") as f:
-            return json.load(f)
-
-    return None
+        from app.services.level_utils import recalculate_levels
+        recalculate_levels(stats)
+        return stats
+    finally:
+        db.close()
 
 
 def get_all_students() -> List[Dict[str, Any]]:
-    """Get all students with their stats - try MariaDB first, then JSON."""
+    """Get all students with their stats from PostgreSQL."""
     students = []
+    db = _require_db_session()
+    try:
+        students_db = db.query(Student).all()
+        usernames = [student.username for student in students_db]
+    finally:
+        db.close()
 
-    if database.DB_AVAILABLE and database.SessionLocal:
-        try:
-            db = database.SessionLocal()
-            students_db = db.query(Student).all()
-
-            for student in students_db:
-                stats = get_student_stats(student.username)
-                if stats:
-                    students.append({
-                        "username": student.username,
-                        "xp": stats.get("xp", {}).get("total", 0),
-                        "level": stats.get("level", {}).get("current", 1),
-                        "display_name": student.display_name or student.username,
-                        "avatar": student.avatar or ""
-                    })
-
-            db.close()
-
-            if students:  # If we got data from DB, return it
-                return students
-
-        except Exception as e:
-            log_fallback(f"Failed to read all students from MariaDB: {e}")
-
-    # Fallback to JSON
-    if STUDENTS_DIR.exists():
-        for student_dir in STUDENTS_DIR.iterdir():
-            if not student_dir.is_dir():
-                continue
-
-            username = student_dir.name
-            stats_file = student_dir / "stats.json"
-            if stats_file.exists():
-                with open(stats_file, "r") as f:
-                    stats = json.load(f)
-
-                students.append({
-                    "username": username,
-                    "xp": stats.get("xp", {}).get("total", 0),
-                    "level": stats.get("level", {}).get("current", 1),
-                    "display_name": stats.get("profile", {}).get("name", username),
-                    "avatar": stats.get("profile", {}).get("avatar", "")
-                })
+    for username in usernames:
+        stats = get_student_stats(username)
+        if stats:
+            students.append({
+                "username": username,
+                "xp": stats.get("xp", {}).get("total", 0),
+                "level": stats.get("level", {}).get("current", 1),
+                "display_name": stats.get("profile", {}).get("name", username),
+                "avatar": stats.get("profile", {}).get("avatar", "")
+            })
 
     return students
 
 
 def get_leaderboard_data() -> List[Dict[str, Any]]:
-    """Get leaderboard data - try MariaDB first, then JSON."""
+    """Get leaderboard data from PostgreSQL."""
     students = get_all_students()
 
     # Sort by XP descending

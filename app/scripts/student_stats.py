@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Legacy JSON inspection helper.
+
+Runtime student stats are served from PostgreSQL; this script is retained only
+for old file-based practice data snapshots.
+"""
 
 import sys
 import json

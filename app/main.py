@@ -1,13 +1,3 @@
-# Load environment variables from .env file if available
-try:
-    from dotenv import load_dotenv
-    from pathlib import Path
-    env_file = Path(__file__).parent.parent / ".env"
-    if env_file.exists():
-        load_dotenv(env_file)
-except ImportError:
-    pass  # python-dotenv not installed, use system env vars
-
 # Load environment variables from .env file FIRST (before any app imports)
 try:
     from dotenv import load_dotenv
@@ -21,13 +11,9 @@ except ImportError:
     from pathlib import Path
     pass  # python-dotenv not installed, use system env vars
 
-from app.auth import load_users, verify_password, update_password
-from app.config import PRACTICE_DATA_DIR
+from app.auth import verify_password, update_password
 from app.database import _load_database
 
-import json
-import shutil
-import logging
 from datetime import date, timedelta
 
 from app.services.exercises import DAILY_EXERCISES
@@ -35,9 +21,10 @@ from app.services.medals import medal_labels
 from app.services.attendance import apply_attendance
 from app.services.level_utils import recalculate_levels
 from app.services.db_operations import (
-    get_db_session,
+    require_db_session,
     sync_student_data_to_db,
     create_or_update_student,
+    initialize_student_records,
     delete_student,
 )
 from app.services.data_reader import get_users, get_student_stats, get_all_students, get_leaderboard_data
@@ -47,14 +34,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi import Form, Request
-from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
-
-# DEFINE DERIVED PATHS ONLY AFTER PRACTICE_DATA_DIR IS SET
-STUDENTS_DIR = PRACTICE_DATA_DIR / "students"
-STUDENTS_DIR.mkdir(parents=True, exist_ok=True)
-LEADERBOARD_FILE = PRACTICE_DATA_DIR / "leaderboard.json"
 
 # Initialize database connection
 _load_database()
@@ -145,9 +125,6 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-###BASE_DIR = Path(os.environ.get("PRACTICE_DATA_DIR", "/srv/practice-data"))
-
 
 # ---------------------------------------------------
 # Auth routes
@@ -280,8 +257,6 @@ def admin_attendance_form(request: Request):
         },
     )
 
-from datetime import date as today_date
-
 @app.post("/admin/attendance")
 def admin_attendance_submit(
     request: Request,
@@ -292,41 +267,7 @@ def admin_attendance_submit(
     if request.session.get("role") != "admin":
         return RedirectResponse("/", status_code=302)
 
-    # Apply attendance XP
-    apply_attendance(student, date)
-
-    # Write history entry
-    stats_file = STUDENTS_DIR / student / "stats.json"
-
-    with open(stats_file, "r") as f:
-        stats = json.load(f)
-
-    history = stats.setdefault("history", {})
-    events = history.setdefault("events", [])
-
-    events.append({
-        "type": "attendance",
-        "name": "Private Lesson",
-        "date": today_date.today().isoformat(),
-        "grade": grade,        
-    })
-
-    with open(stats_file, "w") as f:
-        json.dump(stats, f, indent=2)
-
-    # --------------------------------------------------
-    # DUAL-WRITE: Sync to database
-    # --------------------------------------------------
-    db = get_db_session()
-    if db is not None:
-        try:
-            sync_student_data_to_db(db, student, stats)
-            db.commit()
-        except Exception as e:
-            print(f"Warning: Failed to sync attendance history to database: {e}")
-            db.rollback()
-        finally:
-            db.close()
+    apply_attendance(student, date, grade)
 
     return RedirectResponse(
         "/admin/attendance",
@@ -364,26 +305,19 @@ def remove_student(
             status_code=302
         )
 
-    student_dir = STUDENTS_DIR / student
-
-    if student_dir.exists() and student_dir.is_dir():
-        shutil.rmtree(student_dir)
-
     # Remove from auth system
     from app.auth import delete_user
     delete_user(student)
 
-    # Remove from DB student domain tables to avoid ghost records.
-    db = get_db_session()
-    if db is not None:
-        try:
-            delete_student(db, student)
-            db.commit()
-        except Exception as e:
-            print(f"Warning: Failed to delete student data from database: {e}")
-            db.rollback()
-        finally:
-            db.close()
+    db = require_db_session()
+    try:
+        delete_student(db, student)
+        db.commit()
+    except Exception as e:
+        print(f"Warning: Failed to delete student data from database: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
     return RedirectResponse(
         "/admin/dashboard/student-management",
@@ -419,65 +353,18 @@ def add_student(
     )
 
     # ------------------------------------------------------------------
-    # 2. Create student directory
+    # 2. Create student profile and baseline stats in PostgreSQL
     # ------------------------------------------------------------------
-    student_dir = STUDENTS_DIR / username
-    student_dir.mkdir(parents=True, exist_ok=True)
-
-    # ------------------------------------------------------------------
-    # 3. Create initial stats.json if missing
-    # ------------------------------------------------------------------
-    stats_file = student_dir / "stats.json"
-
-    if not stats_file.exists():
-        stats = {
-            "xp": {
-                "total": 0,
-                "categories": {
-                    "pad_practice": 0
-                }
-            },
-            "level": {
-                "current": 1,
-                "progress_xp": 0,
-                "xp_to_next": 10
-            },
-            "streak": {
-                "current": 0,
-                "longest": 0,
-                "last_practice_date": None
-            },
-            "attendance": {
-                "total": 0,
-                "dates": [],
-                "current_month": {
-                    "month": None,
-                    "count": 0
-                }
-            },
-            "profile": {
-                "name": name,
-                "avatar": avatar
-            },
-            "history": {}
-        }
-
-        with open(stats_file, "w") as f:
-            json.dump(stats, f, indent=2)
-
-    # ------------------------------------------------------------------
-    # 4. DUAL-WRITE: Create student in database
-    # ------------------------------------------------------------------
-    db = get_db_session()
-    if db is not None:
-        try:
-            create_or_update_student(db, username, name, avatar)
-            db.commit()
-        except Exception as e:
-            print(f"Warning: Failed to create student in database: {e}")
-            db.rollback()
-        finally:
-            db.close()
+    db = require_db_session()
+    try:
+        student = create_or_update_student(db, username, name, avatar)
+        initialize_student_records(db, student.id)
+        db.commit()
+    except Exception as e:
+        print(f"Warning: Failed to create student in database: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
     # ------------------------------------------------------------------
     # 4. Redirect back to student management
@@ -506,22 +393,15 @@ def student_dashboard(request: Request):
     modified = validate_streak(stats)
 
     if modified:
-        # Update the stats in both DB and JSON
-        db = get_db_session()
-        if db is not None:
-            try:
-                sync_student_data_to_db(db, student, stats)
-                db.commit()
-            except Exception as e:
-                print(f"Warning: Failed to sync streak validation to database: {e}")
-                db.rollback()
-            finally:
-                db.close()
-
-        # Also update JSON backup
-        stats_file = STUDENTS_DIR / student / "stats.json"
-        with open(stats_file, "w") as f:
-            json.dump(stats, f, indent=2)
+        db = require_db_session()
+        try:
+            sync_student_data_to_db(db, student, stats)
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Failed to persist streak validation to database: {e}")
+            db.rollback()
+        finally:
+            db.close()
 
     return templates.TemplateResponse(
         request,
@@ -559,10 +439,9 @@ def complete_daily_pad_exercise(
         return RedirectResponse("/", status_code=302)
 
     student = request.session["username"]
-    stats_file = STUDENTS_DIR / student / "stats.json"
-
-    with open(stats_file, "r") as f:
-        stats = json.load(f)
+    stats = get_student_stats(student)
+    if stats is None:
+        return RedirectResponse("/", status_code=302)
 
     # --------------------------------------------------
     # DETERMINE XP FROM EXERCISE CONFIG
@@ -602,22 +481,15 @@ def complete_daily_pad_exercise(
         "date": date.today().isoformat(),
     })
 
-    with open(stats_file, "w") as f:
-        json.dump(stats, f, indent=2)
-
-    # --------------------------------------------------
-    # DUAL-WRITE: Sync to database
-    # --------------------------------------------------
-    db = get_db_session()
-    if db is not None:
-        try:
-            sync_student_data_to_db(db, student, stats)
-            db.commit()
-        except Exception as e:
-            print(f"Warning: Failed to sync exercise completion to database: {e}")
-            db.rollback()
-        finally:
-            db.close()
+    db = require_db_session()
+    try:
+        sync_student_data_to_db(db, student, stats)
+        db.commit()
+    except Exception as e:
+        print(f"Warning: Failed to persist exercise completion to database: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
     return RedirectResponse(
         "/student/dashboard",
@@ -746,9 +618,8 @@ def health_check():
             status_code = 503
     else:
         health_status["database"] = "not_configured"
-        # App can still run in JSON-only mode, so this is not necessarily unhealthy
-        health_status["status"] = "degraded"
-        # Still return 200 for degraded (JSON-only mode is acceptable)
+        health_status["status"] = "unhealthy"
+        status_code = 503
     
     # Return JSON response with proper status code
     return JSONResponse(content=health_status, status_code=status_code)

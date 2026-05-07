@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database Viewer - Visual inspection of MariaDB contents
+Database Viewer - visual inspection of PostgreSQL runtime contents.
 Run this to see your database data in a readable format.
 """
 
@@ -27,7 +27,7 @@ def view_database():
 
     db = get_db_session()
     if db is None:
-        print("❌ Cannot connect to database. Please ensure MariaDB is running and database is created.")
+        print("❌ Cannot connect to database. Please ensure PostgreSQL is running and DATABASE_URL is set.")
         return
 
     try:

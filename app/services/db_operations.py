@@ -1,6 +1,6 @@
 """
-Database operations for dual-write strategy.
-Handles writing to MariaDB while keeping JSON as primary read source.
+Database operations for PostgreSQL runtime persistence.
+JSON import/export is handled by explicit maintenance tools only.
 """
 
 from sqlalchemy.orm import Session
@@ -15,6 +15,14 @@ def get_db_session():
     if not database.DB_AVAILABLE:
         return None
     return database.SessionLocal()
+
+
+def require_db_session():
+    """Get a database session or fail clearly for runtime paths."""
+    db = get_db_session()
+    if db is None:
+        raise RuntimeError("Database is required for runtime data writes")
+    return db
 
 
 def create_or_update_student(db: Session, username: str, display_name: str = None, avatar: str = None) -> Student:
@@ -35,6 +43,14 @@ def create_or_update_student(db: Session, username: str, display_name: str = Non
         if avatar:
             student.avatar = avatar
     return student
+
+
+def initialize_student_records(db: Session, student_id: int):
+    """Ensure new students have baseline XP and streak records."""
+    if not db.query(XP).filter(XP.student_id == student_id).first():
+        db.add(XP(student_id=student_id, total=0, pad_practice=0, attendance=0, consistency=0))
+    if not db.query(Streak).filter(Streak.student_id == student_id).first():
+        db.add(Streak(student_id=student_id, current=0, longest=0, last_practice_date=None))
 
 
 def delete_student(db: Session, username: str) -> bool:
@@ -109,9 +125,9 @@ def add_history_event(db: Session, student_id: int, event_type: str, name: str, 
 
 
 def sync_student_data_to_db(db: Session, username: str, stats: dict):
-    """Sync complete student data from JSON stats to database."""
+    """Persist complete student stats to PostgreSQL."""
     if not database.DB_AVAILABLE or db is None:
-        return  # Skip database operations when DB is not available
+        raise RuntimeError("Database is required for runtime student writes")
 
     # Create/update student
     profile = stats.get("profile", {})
@@ -121,6 +137,7 @@ def sync_student_data_to_db(db: Session, username: str, stats: dict):
         display_name=profile.get("name", username),
         avatar=profile.get("avatar", "")
     )
+    initialize_student_records(db, student.id)
 
     # Update XP
     xp_data = stats.get("xp", {})

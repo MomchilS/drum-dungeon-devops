@@ -5,7 +5,14 @@
 # Environment and secrets (never bake into image)
 .env
 .env.*
-!.env.example
+.envrc
+.vault_pass
+.vault-password
+vault-password.txt
+id_rsa
+id_ed25519
+*.pem
+*.key
 
 # Local practice data (mounted at runtime, not in image)
 practice_data/

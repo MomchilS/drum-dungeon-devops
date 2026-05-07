@@ -36,7 +36,7 @@ target_metadata = Base.metadata
 
 def get_url():
     """Get database URL from environment variable."""
-    return os.environ.get("DATABASE_URL", "mysql+pymysql://user:pass@localhost/drum_dungeon")
+    return os.environ.get("DATABASE_URL", "postgresql+psycopg2://user:pass@localhost/drum_dungeon")
 
 
 def run_migrations_offline() -> None:

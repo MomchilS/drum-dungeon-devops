@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Legacy JSON leaderboard helper.
+
+Runtime leaderboard data is served from PostgreSQL; this script is retained
+only for old file-based leaderboard snapshots.
+"""
 
 import json
 from pathlib import Path

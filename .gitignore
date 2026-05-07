@@ -10,7 +10,16 @@ __pycache__/
 # Environment variables
 .env
 .env.*
-!.env.example
+.envrc
+
+# Local secret material
+.vault_pass
+.vault-password
+vault-password.txt
+id_rsa
+id_ed25519
+*.pem
+*.key
 
 # Local practice data
 practice_data/

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Legacy JSON maintenance helper.
+
+Runtime streak handling is PostgreSQL-backed; this script is retained only for
+inspecting or repairing old file-based practice data snapshots.
+"""
 
 from medals import check_and_award_medals
 import json

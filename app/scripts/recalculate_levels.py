@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Legacy JSON maintenance helper.
+
+Runtime level calculation is PostgreSQL-backed; this script is retained only
+for old file-based practice data snapshots.
+"""
 
 import json
 from pathlib import Path

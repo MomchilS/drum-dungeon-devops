@@ -1,0 +1,85 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy app to staging
+    runs-on: self-hosted
+    environment: Staging
+
+    env:
+      ANSIBLE_HOST_KEY_CHECKING: "true"
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH and vault files
+        id: secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          secret_dir="$RUNNER_TEMP/drum-dungeon-secrets"
+          mkdir -p "$secret_dir"
+          chmod 700 "$secret_dir"
+
+          ssh_key_file="$secret_dir/deploy_key"
+          vault_file="$secret_dir/vault_pass"
+          known_hosts_file="$secret_dir/known_hosts"
+
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > "$ssh_key_file"
+          printf '%s\n' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > "$vault_file"
+          chmod 600 "$ssh_key_file" "$vault_file"
+
+          ssh-keyscan -H "$SSH_HOST" > "$known_hosts_file"
+          chmod 600 "$known_hosts_file"
+
+          {
+            echo "SSH_KEY_FILE=$ssh_key_file"
+            echo "VAULT_PASSWORD_FILE=$vault_file"
+            echo "ANSIBLE_SSH_ARGS=-o UserKnownHostsFile=$known_hosts_file"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Ansible collections
+        working-directory: ansible
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Deploy app to staging
+        working-directory: ansible
+        run: |
+          ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml \
+            --user "$SSH_USER" \
+            --private-key "$SSH_KEY_FILE" \
+            --vault-password-file "$VAULT_PASSWORD_FILE" \
+            --tags app \
+            --limit app-staging
+
+      - name: Check staging health
+        working-directory: ansible
+        run: |
+          ansible -i inventory/phase1.yml app-staging \
+            --user "$SSH_USER" \
+            --private-key "$SSH_KEY_FILE" \
+            --vault-password-file "$VAULT_PASSWORD_FILE" \
+            -b \
+            -m uri \
+            -a "url=http://127.0.0.1:8000/health return_content=yes status_code=200"
+
+      - name: Clean up temporary secret files
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/drum-dungeon-secrets"

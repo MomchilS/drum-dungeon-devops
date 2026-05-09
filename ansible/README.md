@@ -1,89 +1,125 @@
-# Ansible — Phase 1 deployment
+# Ansible
 
-Phase 1 configures three Proxmox LXCs:
-- `app-staging`
-- `app-prod`
-- `db-prod`
+Ansible configures and deploys the Drum Dungeon staging and production environments.
 
-## Prerequisites
+## Hosts and Inventory
 
-- Ansible Core (or Ansible) 2.14+
-- Collections: `ansible-galaxy collection install -r requirements.yml`
-- Terraform has already applied from `terraform/proxmox`
-- SSH access to the created LXCs
-
-## Inventory
-
-Primary day-to-day deploy commands in this repo use static inventory:
+Primary inventory:
 
 ```bash
 -i inventory/phase1.yml
 ```
 
-This avoids coupling routine app deploys to local Terraform state output.
+Current static host layout:
 
-`inventory.yml` still exists and uses `scripts/terraform_inventory.py`, which calls:
+| Host | IP | Role |
+| --- | --- | --- |
+| `app-staging` | `192.168.2.20` | Staging app LXC |
+| `app-prod` | `192.168.2.21` | Production app LXC |
+| `db-prod` | `192.168.2.22` | PostgreSQL 17 LXC |
 
-```bash
-terraform output -json phase1_inventory_hosts
-```
+Static inventory is used for day-to-day operations so app deploys do not depend on local Terraform state. Dynamic inventory support remains available through `inventory.yml` and `scripts/terraform_inventory.py`.
 
-That means inventory is pulled from Terraform outputs directly.
+## Roles
 
-## Secrets (Vault)
+| Role | Purpose |
+| --- | --- |
+| `common` | Baseline OS packages and host setup |
+| `database` | PostgreSQL 17 installation, access configuration, database/user setup |
+| `migration` | Explicit JSON-to-PostgreSQL import/bootstrap helper |
+| `app` | Syncs code to `/opt/app`, creates venv, writes `.env`, installs systemd unit, starts app |
 
-Primary vault structure is environment-specific:
+## Main Playbook
 
-1. `cp group_vars/staging/vault.example.yml group_vars/staging/vault.yml`
-2. `cp group_vars/production/vault.example.yml group_vars/production/vault.yml`
-3. Edit both with real `db_user`, `db_password`, `session_secret_key`
-4. Encrypt each:
-   - `ansible-vault encrypt group_vars/staging/vault.yml`
-   - `ansible-vault encrypt group_vars/production/vault.yml`
-5. Run playbooks with `--ask-vault-pass` so Ansible can read the secrets.
-
-## Runtime data source
-
-Staging and production app nodes use PostgreSQL as the runtime source of truth.
-JSON is not used as a live fallback for auth, student stats, attendance, XP, or history.
-Existing JSON import/migration scripts are maintenance tools only.
-
-## Playbooks
-
-From the `ansible` directory:
-
-**Canonical app deploy workflow (explicit per environment):**
-```bash
-ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags app --limit app-staging
-ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags app --limit app-prod
-```
-
-**Infrastructure/bootstrap runs (shared DB host):**
-```bash
-ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags common
-ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags db
-ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml --ask-vault-pass --tags migrate
-```
-
-## Validation commands
-
-Use these checks after deploys:
+Primary playbook:
 
 ```bash
-ansible -i inventory/phase1.yml app-staging -u root -b -m shell -a "grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|SESSION_SECRET_KEY)=' /opt/app/.env" --ask-vault-pass
-ansible -i inventory/phase1.yml app-prod -u root -b -m shell -a "grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|SESSION_SECRET_KEY)=' /opt/app/.env" --ask-vault-pass
+playbooks/phase1.yml
 ```
 
-## Legacy playbooks (kept for reference)
+It contains separate plays for baseline setup, database setup, migration, staging app deploy, and production app deploy.
 
-The following playbooks are retained but are not the canonical deployment path:
+## Secrets
 
-- `playbooks/deploy-app.yml`
-- `playbooks/common.yml`
+Manual operations use environment-specific vault files:
 
-## Role summary
+```text
+group_vars/staging/vault.yml
+group_vars/production/vault.yml
+```
 
-- **common** — Updates apt, sets timezone, and installs baseline packages (`python3-pip`, `libpq-dev`, `git`).
-- **database** — Installs PostgreSQL 17, configures remote access, and creates `student_db`.
-- **migration** — Uploads `students_data` and imports JSON content into PostgreSQL tables as an explicit maintenance/bootstrap step.
-- **app** — Syncs code to `/opt/app`, builds venv, writes env file, and manages app with systemd.
+These files are ignored by Git and should be encrypted with Ansible Vault. They contain environment-specific DB credentials and `session_secret_key` values.
+
+GitHub Actions deploys use GitHub Environment secrets to generate temporary vault vars during workflow runs. Those generated files are deleted by the workflow and must not be committed.
+
+## Routine App Deploys
+
+From `ansible/`, install collections:
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
+Deploy staging app only:
+
+```bash
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml \
+  --ask-vault-pass \
+  --tags app \
+  --limit app-staging
+```
+
+Deploy production app only:
+
+```bash
+ansible-playbook -i inventory/phase1.yml playbooks/phase1.yml \
+  --ask-vault-pass \
+  --tags app \
+  --limit app-prod
+```
+
+These commands sync the app, install dependencies, write the environment file, and manage the `drum-dungeon` systemd service.
+
+## Health Checks
+
+```bash
+ansible -i inventory/phase1.yml app-staging -u root -b -m uri \
+  -a "url=http://127.0.0.1:8000/health return_content=yes status_code=200" \
+  --ask-vault-pass
+
+ansible -i inventory/phase1.yml app-prod -u root -b -m uri \
+  -a "url=http://127.0.0.1:8000/health return_content=yes status_code=200" \
+  --ask-vault-pass
+```
+
+Check deployed DB target without printing passwords:
+
+```bash
+ansible -i inventory/phase1.yml app-staging -u root -b -m shell \
+  -a "grep -E '^(ENV|DB_HOST|DB_PORT|DB_NAME|DB_USER)=' /opt/app/.env" \
+  --ask-vault-pass
+
+ansible -i inventory/phase1.yml app-prod -u root -b -m shell \
+  -a "grep -E '^(ENV|DB_HOST|DB_PORT|DB_NAME|DB_USER)=' /opt/app/.env" \
+  --ask-vault-pass
+```
+
+## CI/CD Relationship
+
+GitHub Actions calls Ansible from the self-hosted runner:
+
+- `deploy-staging.yml` runs automatically on push to `main` and targets `app-staging`.
+- `deploy-production.yml` runs manually with the `Production` environment and targets `app-prod`.
+
+Both workflows deploy only the `app` tag. They do not run database or migration tasks.
+
+## Safety Notes
+
+Do not run these casually in CI/CD:
+
+```bash
+--tags db
+--tags migrate
+```
+
+Use database and migration tags only for intentional infrastructure/bootstrap maintenance. Routine code releases should use app-only deploys.
